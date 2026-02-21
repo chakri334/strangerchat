@@ -136,6 +136,9 @@ class ChatAppTester:
     def test_socket_events(self):
         """Test Socket.IO events with two clients"""
         try:
+            # Use localhost since external Socket.IO isn't working
+            socket_url = "http://localhost:8001"
+            
             # Create two clients
             client1 = socketio.Client()
             client2 = socketio.Client()
@@ -195,8 +198,8 @@ class ChatAppTester:
                 print(f"Client 2 received message: {data}")
             
             # Connect both clients
-            client1.connect(self.base_url, wait_timeout=10)
-            client2.connect(self.base_url, wait_timeout=10)
+            client1.connect(socket_url, wait_timeout=10)
+            client2.connect(socket_url, wait_timeout=10)
             
             # Wait for events to process
             time.sleep(5)
