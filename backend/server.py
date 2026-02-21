@@ -310,6 +310,8 @@ async def try_match(city: str):
 
 async def create_match(user1_sid: str, user2_sid: str):
     """Create a match between two users"""
+    print(f'[MATCH] Creating match between {user1_sid} and {user2_sid}', flush=True)
+    
     # Create room
     room_id = str(uuid.uuid4())
     active_chats[room_id] = [user1_sid, user2_sid]
@@ -337,6 +339,7 @@ async def create_match(user1_sid: str, user2_sid: str):
         }
     }, room=user2_sid)
     
+    print(f'[MATCH] Matched {user1_sid} ({user1_data.get("city", "Unknown")}) and {user2_sid} ({user2_data.get("city", "Unknown")}) in room {room_id}', flush=True)
     logger.info(f'Matched {user1_sid} ({user1_data.get("city", "Unknown")}) and {user2_sid} ({user2_data.get("city", "Unknown")}) in room {room_id}')
 
 async def try_global_match_after_delay(sid: str, delay: int):
