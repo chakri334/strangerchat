@@ -53,7 +53,7 @@ const ChatPage = ({ socket, partner, onClose, onSkip }) => {
     });
     
     socket.on('partner_disconnected', () => {
-      toast.info('Stranger disconnected');
+      toast.info('Chat partner disconnected');
       setPartnerDisconnected(true);
     });
     
