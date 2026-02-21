@@ -380,6 +380,8 @@ const ChatPage = ({ socket, partner, onClose, onSkip }) => {
               </svg>
             </button>
           </form>
+          </>
+        )}
         </div>
         
         {/* Hidden file input */}
