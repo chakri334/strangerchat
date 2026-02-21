@@ -316,6 +316,34 @@ async def create_match(user1_sid: str, user2_sid: str):
     
     logger.info(f'Matched {user1_sid} ({user1_data.get("city", "Unknown")}) and {user2_sid} ({user2_data.get("city", "Unknown")}) in room {room_id}')
 
+async def try_global_match_after_delay(sid: str, delay: int):
+    """Try to match user with anyone globally after a delay"""
+    await asyncio.sleep(delay)
+    
+    # Check if user is still waiting
+    if sid not in user_rooms:  # Not matched yet
+        # Find any other waiting user from any city
+        for city, users in list(waiting_queue.items()):
+            if sid in users:
+                # User is still waiting, try to match with anyone
+                for other_city, other_users in list(waiting_queue.items()):
+                    if other_users and (other_city != city or len(other_users) > 1):
+                        # Found someone, match them
+                        if sid in waiting_queue.get(city, []):
+                            waiting_queue[city].remove(sid)
+                            if not waiting_queue[city]:
+                                del waiting_queue[city]
+                        
+                        other_sid = other_users[0]
+                        if other_sid != sid:
+                            other_users.pop(0)
+                            if not other_users and other_city in waiting_queue:
+                                del waiting_queue[other_city]
+                            
+                            await create_match(sid, other_sid)
+                            logger.info(f'Global match: {sid} with {other_sid}')
+                            return
+
 async def delete_photo_after_delay(photo_id: str, delay: int):
     await asyncio.sleep(delay)
     # Photo is already sent and handled client-side
