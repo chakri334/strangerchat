@@ -143,6 +143,8 @@ const ChatModal = ({ socket, partner, onClose, onPhotoView }) => {
     
     if (!inputMessage.trim()) return;
     
+    console.log('📤 Sending message:', inputMessage);
+    
     // Add to local messages
     setMessages((prev) => [...prev, {
       text: inputMessage,
@@ -152,6 +154,7 @@ const ChatModal = ({ socket, partner, onClose, onPhotoView }) => {
     
     // Send via socket
     socket.emit('send_message', { message: inputMessage });
+    console.log('✓ Message emitted to server');
     
     setInputMessage('');
   };
