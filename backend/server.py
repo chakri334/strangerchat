@@ -77,6 +77,7 @@ async def get_stats():
 # Socket.IO events
 @sio.event
 async def connect(sid):
+    print(f'[SOCKET] Client connected: {sid}', flush=True)
     logger.info(f'Client connected: {sid}')
     # Send stats immediately
     await broadcast_stats()
