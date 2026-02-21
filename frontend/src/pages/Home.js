@@ -42,10 +42,10 @@ const Home = () => {
     // Detect user location
     detectLocation();
     
-    // Initialize socket
+    // Initialize socket with polling transport
     const newSocket = io(BACKEND_URL, {
       path: '/api/socket.io',
-      transports: ['websocket', 'polling']
+      transports: ['polling']
     });
     
     newSocket.on('connect', () => {
