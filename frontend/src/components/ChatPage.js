@@ -277,7 +277,6 @@ const ChatPage = ({ socket, partner, onClose }) => {
             <AlertCircle size={12} />
             Report
           </button>
-        </button>
       </div>
       
       {/* Input Area */}
