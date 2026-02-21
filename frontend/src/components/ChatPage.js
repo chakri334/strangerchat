@@ -204,7 +204,8 @@ const ChatPage = ({ socket, partner, onClose }) => {
   };
   
   return (
-    <div className="fixed inset-0 z-50 bg-[#0a0a0a] text-white flex flex-col" data-testid="chat-page">
+    <>
+      <div className="fixed inset-0 z-50 bg-[#0a0a0a] text-white flex flex-col" data-testid="chat-page">
       {/* Header */}
       <div className="p-4 border-b border-white/10 flex items-center justify-between bg-gradient-to-r from-[#7c5cfc]/10 to-[#fc5c7d]/10">
         <div className="flex items-center gap-3">
