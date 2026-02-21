@@ -227,9 +227,9 @@ const ChatPage = ({ socket, partner, onClose }) => {
           <X size={24} />
         </button>
       </div>
-        
-        {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-3" data-testid="messages-container">
+      
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-3" data-testid="messages-container">
           {messages.length === 0 && (
             <div className="text-center text-gray-500 mt-8">
               <MessageCircle size={48} className="mx-auto mb-2 opacity-50" />
