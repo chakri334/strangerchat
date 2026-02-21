@@ -253,12 +253,37 @@ async def get_random_topic(sid, data):
 # Helper functions
 async def try_match(city: str):
     if city not in waiting_queue or len(waiting_queue[city]) < 2:
+        # If less than 2 users in this city, try to match with any available user from other cities
+        if city in waiting_queue and len(waiting_queue[city]) == 1:
+            # Find a user from any other city who's also waiting alone
+            for other_city, other_users in waiting_queue.items():
+                if other_city != city and len(other_users) >= 1:
+                    # Match across cities
+                    user1_sid = waiting_queue[city].pop(0)
+                    user2_sid = other_users.pop(0)
+                    
+                    # Clean up empty queues
+                    if not waiting_queue[city]:
+                        del waiting_queue[city]
+                    if not other_users and other_city in waiting_queue:
+                        del waiting_queue[other_city]
+                    
+                    await create_match(user1_sid, user2_sid)
+                    return
         return
     
-    # Get two users from queue
+    # Get two users from same city
     user1_sid = waiting_queue[city].pop(0)
     user2_sid = waiting_queue[city].pop(0)
     
+    # Clean up empty queue
+    if not waiting_queue[city]:
+        del waiting_queue[city]
+    
+    await create_match(user1_sid, user2_sid)
+
+async def create_match(user1_sid: str, user2_sid: str):
+    """Create a match between two users"""
     # Create room
     room_id = str(uuid.uuid4())
     active_chats[room_id] = [user1_sid, user2_sid]
@@ -286,7 +311,7 @@ async def try_match(city: str):
         }
     }, room=user2_sid)
     
-    logger.info(f'Matched {user1_sid} and {user2_sid} in room {room_id}')
+    logger.info(f'Matched {user1_sid} ({user1_data.get("city", "Unknown")}) and {user2_sid} ({user2_data.get("city", "Unknown")}) in room {room_id}')
 
 async def delete_photo_after_delay(photo_id: str, delay: int):
     await asyncio.sleep(delay)
