@@ -352,17 +352,17 @@ const ChatPage = ({ socket, partner, onClose }) => {
             </button>
           </form>
         </div>
+        
+        {/* Hidden file input */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handlePhotoUpload}
+          className="hidden"
+          data-testid="photo-input"
+        />
       </div>
-      
-      {/* Hidden file input */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        onChange={handlePhotoUpload}
-        className="hidden"
-        data-testid="photo-input"
-      />
       
       {/* Photo Viewer */}
       {photoToView && (
