@@ -49,17 +49,24 @@ const Home = () => {
     });
     
     newSocket.on('connect', () => {
-      console.log('Connected to server');
-      // Register user
-      newSocket.emit('register_user', {
+      console.log('✓ Connected to server');
+      // Register user immediately
+      const userData = {
         name: savedName,
         age: savedAge,
         gender: savedGender,
         city: savedCity
-      });
+      };
+      console.log('Registering user:', userData);
+      newSocket.emit('register_user', userData);
+    });
+    
+    newSocket.on('registered', (data) => {
+      console.log('✓ User registered successfully');
     });
     
     newSocket.on('stats_update', (data) => {
+      console.log('Stats updated:', data);
       setStats(data);
       if (data.city_counts) {
         const cityList = Object.keys(data.city_counts);
