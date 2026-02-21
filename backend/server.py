@@ -231,11 +231,33 @@ async def handle_send_photo(sid, data):
 
 @sio.on('skip_chat')
 async def handle_skip_chat(sid, data):
-    await disconnect_chat(sid, notify_partner=True)
+    print(f'[SKIP] User {sid} clicked skip', flush=True)
     
-    # Rejoin queue immediately
+    # Notify partner that user skipped (same as disconnect for partner)
+    if sid in user_rooms:
+        room_id = user_rooms[sid]
+        
+        if room_id in active_chats:
+            partner_sid = [s for s in active_chats[room_id] if s != sid]
+            
+            if partner_sid:
+                print(f'[SKIP] Notifying partner {partner_sid[0]} that user skipped', flush=True)
+                await sio.emit('partner_disconnected', room=partner_sid[0])
+            
+            # Clean up partner's room reference
+            if partner_sid and partner_sid[0] in user_rooms:
+                del user_rooms[partner_sid[0]]
+            
+            del active_chats[room_id]
+        
+        del user_rooms[sid]
+    
+    await sio.emit('chat_ended', room=sid)
+    
+    # Rejoin queue immediately for the user who skipped
     if sid in active_connections:
         city = active_connections[sid]['city']
+        print(f'[SKIP] User {sid} rejoining queue for {city}', flush=True)
         await handle_join_queue(sid, {'city': city})
 
 @sio.on('disconnect_chat')
