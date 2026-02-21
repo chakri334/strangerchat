@@ -191,11 +191,16 @@ const ChatPage = ({ socket, partner, onClose, onSkip }) => {
   };
   
   const handleSkip = () => {
-    console.log('Skip clicked');
+    console.log('Skip clicked, onSkip:', onSkip);
     socket.emit('skip_chat', {});
-    if (onSkip) {
-      onSkip(); // Triggers waiting page immediately
+    
+    // Use onSkip if available, otherwise use onClose
+    if (onSkip && typeof onSkip === 'function') {
+      console.log('Calling onSkip()');
+      onSkip();
     } else {
+      console.log('onSkip not available, calling onClose()');
+      toast.info('Finding new stranger...');
       onClose();
     }
   };
