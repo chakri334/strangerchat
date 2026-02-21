@@ -203,30 +203,29 @@ const ChatPage = ({ socket, partner, onClose }) => {
   };
   
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm" data-testid="chat-modal">
-      <div className="w-full sm:max-w-2xl h-[85vh] sm:h-[80vh] bg-[#0a0a0a] border border-white/10 sm:rounded-2xl overflow-hidden flex flex-col">
-        {/* Header */}
-        <div className="p-4 border-b border-white/10 flex items-center justify-between bg-gradient-to-r from-[#7c5cfc]/10 to-[#fc5c7d]/10">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#7c5cfc] to-[#fc5c7d] flex items-center justify-center text-2xl">
-              {partner.emoji}
-            </div>
-            <div>
-              <div className="font-bold" data-testid="partner-name">{partner.name}</div>
-              <div className="text-xs text-green-400 flex items-center gap-1">
-                <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
-                Online
-              </div>
+    <div className="fixed inset-0 z-50 bg-[#0a0a0a] text-white flex flex-col" data-testid="chat-page">
+      {/* Header */}
+      <div className="p-4 border-b border-white/10 flex items-center justify-between bg-gradient-to-r from-[#7c5cfc]/10 to-[#fc5c7d]/10">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#7c5cfc] to-[#fc5c7d] flex items-center justify-center text-2xl">
+            {partner.emoji}
+          </div>
+          <div>
+            <div className="font-bold" data-testid="partner-name">{partner.name}</div>
+            <div className="text-xs text-green-400 flex items-center gap-1">
+              <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
+              Online
             </div>
           </div>
-          <button
-            onClick={handleDisconnect}
-            className="p-2 rounded-full hover:bg-white/10 transition-colors"
-            data-testid="close-chat-button"
-          >
-            <X size={24} />
-          </button>
         </div>
+        <button
+          onClick={handleDisconnect}
+          className="p-2 rounded-full hover:bg-white/10 transition-colors"
+          data-testid="close-chat-button"
+        >
+          <X size={24} />
+        </button>
+      </div>
         
         {/* Messages */}
         <div className="flex-1 overflow-y-auto p-4 space-y-3" data-testid="messages-container">
