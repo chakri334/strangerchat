@@ -346,10 +346,12 @@ const ChatPage = ({ socket, partner, onClose }) => {
             {/* Send Button */}
             <button
               type="submit"
-              className="px-5 py-3 bg-gradient-to-r from-[#7c5cfc] to-[#fc5c7d] rounded-xl font-medium hover:shadow-lg hover:shadow-purple-500/20 transition-all"
+              className="px-4 py-3 bg-gradient-to-r from-[#7c5cfc] to-[#fc5c7d] rounded-xl font-medium hover:shadow-lg hover:shadow-purple-500/20 transition-all"
               data-testid="send-message-button"
             >
-              Send
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M2 21L23 12L2 3V10L17 12L2 14V21Z" fill="currentColor"/>
+              </svg>
             </button>
           </form>
         </div>
