@@ -192,34 +192,7 @@ const Home = () => {
           </button>
         </header>
         
-        {/* Location */}
-        <div className="px-6 mt-4">
-          <div className="flex items-center gap-2 text-gray-300">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="currentColor"/>
-            </svg>
-            <span className="text-sm" data-testid="current-city">{userCity}</span>
-            <span className="text-xs text-gray-500">• {stats.online} active</span>
-          </div>
-          
-          {/* City chips */}
-          <div className="flex gap-2 mt-4 overflow-x-auto pb-2 scrollbar-hide" data-testid="city-chips">
-            {cities.map((city) => (
-              <button
-                key={city}
-                onClick={() => handleCitySelect(city)}
-                className={`px-4 py-2 rounded-full text-sm whitespace-nowrap transition-all ${
-                  city === userCity
-                    ? 'bg-gradient-to-r from-[#7c5cfc] to-[#fc5c7d] text-white'
-                    : 'bg-white/5 text-gray-300 hover:bg-white/10'
-                }`}
-                data-testid={`city-chip-${city.toLowerCase().replace(/\s+/g, '-')}`}
-              >
-                {city}
-              </button>
-            ))}
-          </div>
-        </div>
+        {/* Location detection happens in background - no UI shown */}
         
         {/* Connect Button */}
         <div className="flex-1 flex items-center justify-center px-6 py-12">
