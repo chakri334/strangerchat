@@ -76,8 +76,10 @@ async def get_stats():
 
 # Socket.IO events
 @sio.event
-async def connect(sid, environ):
+async def connect(sid):
     logger.info(f'Client connected: {sid}')
+    # Send stats immediately
+    await broadcast_stats()
     
 @sio.event
 async def disconnect(sid):
