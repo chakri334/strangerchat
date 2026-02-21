@@ -362,8 +362,16 @@ const ChatPage = ({ socket, partner, onClose }) => {
         className="hidden"
         data-testid="photo-input"
       />
+      
+      {/* Photo Viewer */}
+      {photoToView && (
+        <PhotoViewer
+          photo={photoToView}
+          onClose={() => setPhotoToView(null)}
+        />
+      )}
     </div>
   );
 };
 
-export default ChatModal;
+export default ChatPage;
