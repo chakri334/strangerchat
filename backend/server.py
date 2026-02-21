@@ -326,6 +326,11 @@ async def create_match(user1_sid: str, user2_sid: str):
     """Create a match between two users"""
     print(f'[MATCH] Creating match between {user1_sid} and {user2_sid}', flush=True)
     
+    # Prevent self-matching
+    if user1_sid == user2_sid:
+        print(f'[MATCH] ERROR: Cannot match user with themselves!', flush=True)
+        return
+    
     # Create room
     room_id = str(uuid.uuid4())
     active_chats[room_id] = [user1_sid, user2_sid]
