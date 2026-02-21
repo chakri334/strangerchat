@@ -154,6 +154,16 @@ const Home = () => {
     setIsSearching(false);
   };
   
+  const handleSkipToNew = () => {
+    // Close current chat
+    setChatActive(false);
+    setPartner(null);
+    // Start searching immediately
+    setIsSearching(true);
+    socket.emit('join_queue', { city: userCity });
+    toast.info('Finding new stranger...');
+  };
+  
   const handleCancelSearch = () => {
     setIsSearching(false);
     // Could emit a leave_queue event if needed
@@ -171,6 +181,7 @@ const Home = () => {
         socket={socket}
         partner={partner}
         onClose={handleCloseChat}
+        onSkip={handleSkipToNew}
       />
     );
   }
