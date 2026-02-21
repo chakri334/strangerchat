@@ -135,14 +135,7 @@ const Settings = () => {
           )}
         </div>
         
-        {/* Location info - hidden from user but saved */}
-        <div className="bg-white/5 rounded-xl p-4 border border-white/10">
-          <div className="flex items-center gap-2 text-gray-300">
-            <MapPin size={16} />
-            <span className="text-sm">Your location: <span className="text-white font-medium">{selectedCity}</span></span>
-          </div>
-          <p className="text-xs text-gray-500 mt-2">Location detected automatically for better matching</p>
-        </div>
+        {/* Location is auto-detected in background - not shown to user */}
         
         {/* Save Button */}
         <button
