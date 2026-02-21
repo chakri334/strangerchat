@@ -372,7 +372,7 @@ const ChatPage = ({ socket, partner, onClose }) => {
           onClose={() => setPhotoToView(null)}
         />
       )}
-    </div>
+    </>
   );
 };
 
