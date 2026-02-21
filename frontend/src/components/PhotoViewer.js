@@ -85,10 +85,6 @@ const PhotoViewer = ({ photo, onClose }) => {
           </div>
         )}
       </div>
-      
-      <div className="absolute bottom-8 text-center text-white/60 text-sm">
-        Photo will disappear in {timeLeft} seconds
-      </div>
     </div>
   );
 };
