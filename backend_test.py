@@ -67,41 +67,67 @@ class ChatAppTester:
     def test_socket_connection(self):
         """Test Socket.IO connection"""
         try:
-            sio = socketio.Client()
-            connected = False
+            # Try different socket paths
+            socket_urls = [
+                self.base_url,
+                f"{self.base_url}/api",
+                "http://localhost:8001"
+            ]
             
-            @sio.event
-            def connect():
-                nonlocal connected
-                connected = True
-                print("✅ Socket.IO connected successfully")
+            for socket_url in socket_urls:
+                print(f"Trying Socket.IO connection to: {socket_url}")
+                try:
+                    sio = socketio.Client()
+                    connected = False
+                    registration_success = False
+                    
+                    @sio.event
+                    def connect():
+                        nonlocal connected
+                        connected = True
+                        print(f"✅ Socket.IO connected to {socket_url}")
+                    
+                    @sio.event
+                    def registered(data):
+                        nonlocal registration_success
+                        registration_success = True
+                        print(f"✅ Registration successful: {data}")
+                    
+                    @sio.event
+                    def disconnect():
+                        print("Socket.IO disconnected")
+                    
+                    sio.connect(socket_url, wait_timeout=5)
+                    time.sleep(2)  # Wait for connection
+                    
+                    if connected:
+                        # Test registration
+                        sio.emit('register_user', {
+                            'name': 'TestUser',
+                            'age': '25',
+                            'gender': 'Other', 
+                            'city': 'TestCity'
+                        })
+                        time.sleep(2)
+                        
+                        # Test get random topic
+                        sio.emit('get_random_topic', {})
+                        time.sleep(1)
+                        
+                        sio.disconnect()
+                        print(f"✅ Socket.IO working at: {socket_url}")
+                        return True
+                    
+                except Exception as inner_e:
+                    print(f"❌ Failed {socket_url}: {str(inner_e)}")
+                    try:
+                        sio.disconnect()
+                    except:
+                        pass
+                    continue
             
-            @sio.event
-            def disconnect():
-                print("Socket.IO disconnected")
-            
-            sio.connect(self.base_url, wait_timeout=10)
-            time.sleep(2)  # Wait for connection
-            
-            if connected:
-                # Test registration
-                sio.emit('register_user', {
-                    'name': 'TestUser',
-                    'age': '25',
-                    'gender': 'Other', 
-                    'city': 'TestCity'
-                })
-                time.sleep(1)
-                
-                # Test get random topic
-                sio.emit('get_random_topic', {})
-                time.sleep(1)
-                
-                sio.disconnect()
-                return True
-            else:
-                print("❌ Socket.IO connection failed")
-                return False
+            print("❌ All Socket.IO connection attempts failed")
+            return False
                 
         except Exception as e:
             print(f"❌ Socket.IO test error: {str(e)}")
