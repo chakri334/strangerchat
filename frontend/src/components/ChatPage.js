@@ -258,10 +258,10 @@ const ChatPage = ({ socket, partner, onClose }) => {
             </div>
           ))}
           <div ref={messagesEndRef} />
-        </div>
-        
-        {/* Action Pills */}
-        <div className="px-4 pb-2 flex gap-2">
+      </div>
+      
+      {/* Action Pills */}
+      <div className="px-4 pb-2 flex gap-2">
           <button
             onClick={handleRandomTopic}
             className="px-3 py-1.5 bg-white/5 hover:bg-white/10 rounded-full text-xs transition-colors"
