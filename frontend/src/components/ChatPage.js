@@ -44,12 +44,18 @@ const ChatPage = ({ socket, partner, onClose, onSkip }) => {
       }
     });
     
+    socket.on('partner_disconnected', () => {
+      toast.info('Stranger disconnected');
+      setPartnerDisconnected(true);
+    });
+    
     return () => {
       console.log('ChatPage unmounting, removing listeners');
       socket.off('new_message');
       socket.off('new_photo');
       socket.off('random_topic');
       socket.off('audio_signal');
+      socket.off('partner_disconnected');
       
       if (peer) {
         peer.destroy();
