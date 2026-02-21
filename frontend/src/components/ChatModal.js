@@ -12,8 +12,11 @@ const ChatModal = ({ socket, partner, onClose, onPhotoView }) => {
   const fileInputRef = useRef(null);
   
   useEffect(() => {
+    console.log('ChatModal mounted, setting up Socket.IO listeners');
+    
     // Socket listeners
     socket.on('new_message', (data) => {
+      console.log('📨 Received message from partner:', data);
       setMessages((prev) => [...prev, {
         text: data.message,
         from: 'partner',
@@ -39,6 +42,7 @@ const ChatModal = ({ socket, partner, onClose, onPhotoView }) => {
     });
     
     return () => {
+      console.log('ChatModal unmounting, removing listeners');
       socket.off('new_message');
       socket.off('new_photo');
       socket.off('random_topic');
