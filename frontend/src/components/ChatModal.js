@@ -280,50 +280,39 @@ const ChatModal = ({ socket, partner, onClose, onPhotoView }) => {
         
         {/* Input Area */}
         <div className="p-4 border-t border-white/10">
-          {/* Main Action Buttons */}
+          {/* Main Action Buttons - Smaller and cleaner */}
           <div className="flex gap-2 mb-3">
             <button
               onClick={handleDisconnect}
-              className="flex-1 py-3 bg-red-500/20 hover:bg-red-500/30 rounded-xl font-medium transition-colors text-red-400"
+              className="flex-1 py-2 bg-red-500/20 hover:bg-red-500/30 rounded-lg text-sm font-medium transition-colors text-red-400"
               data-testid="disconnect-button"
             >
               Disconnect
             </button>
             <button
-              onClick={() => fileInputRef.current?.click()}
-              className="flex-1 py-3 bg-gradient-to-r from-[#7c5cfc] to-[#fc5c7d] hover:shadow-lg hover:shadow-purple-500/20 rounded-xl font-medium transition-all flex items-center justify-center gap-2"
-              data-testid="share-photo-button"
-            >
-              <ImageIcon size={20} />
-              Share Photo
-            </button>
-            <button
               onClick={handleSkip}
-              className="flex-1 py-3 bg-[#7c5cfc]/20 hover:bg-[#7c5cfc]/30 rounded-xl font-medium transition-colors text-[#7c5cfc] flex items-center justify-center gap-2"
+              className="flex-1 py-2 bg-[#7c5cfc]/20 hover:bg-[#7c5cfc]/30 rounded-lg text-sm font-medium transition-colors text-[#7c5cfc] flex items-center justify-center gap-2"
               data-testid="skip-button"
             >
-              <SkipForward size={20} />
+              <SkipForward size={16} />
               Skip
             </button>
           </div>
           
-          {/* Audio Toggle */}
-          <div className="mb-3">
+          {/* Message Input with Icons */}
+          <form onSubmit={handleSendMessage} className="flex items-center gap-2">
+            {/* Share Photo Icon */}
             <button
-              onClick={toggleAudio}
-              className={`w-full py-2 rounded-lg font-medium transition-all ${
-                audioActive
-                  ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-                  : 'bg-white/5 text-gray-400 hover:bg-white/10'
-              }`}
-              data-testid="audio-toggle-button"
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="p-2.5 rounded-full bg-white/5 hover:bg-white/10 transition-colors"
+              data-testid="share-photo-icon"
+              title="Share Photo"
             >
-              {audioActive ? '🎤 Audio Active' : '🎤 Start Audio Chat'}
+              <ImageIcon size={20} className="text-[#7c5cfc]" />
             </button>
-          </div>
-          
-          {/* Message Input */}
-          <form onSubmit={handleSendMessage} className="flex gap-2">
+            
+            {/* Text Input */}
             <input
               type="text"
               value={inputMessage}
@@ -332,9 +321,30 @@ const ChatModal = ({ socket, partner, onClose, onPhotoView }) => {
               className="flex-1 px-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#7c5cfc] transition-all"
               data-testid="message-input"
             />
+            
+            {/* Audio Toggle Icon */}
+            <button
+              type="button"
+              onClick={toggleAudio}
+              className={`p-2.5 rounded-full transition-all ${
+                audioActive
+                  ? 'bg-green-500/20 text-green-400 ring-2 ring-green-500/30'
+                  : 'bg-white/5 text-gray-400 hover:bg-white/10'
+              }`}
+              data-testid="audio-toggle-icon"
+              title={audioActive ? 'Audio Active' : 'Start Audio'}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 1C10.34 1 9 2.34 9 4V12C9 13.66 10.34 15 12 15C13.66 15 15 13.66 15 12V4C15 2.34 13.66 1 12 1Z" fill="currentColor"/>
+                <path d="M19 10V12C19 15.87 15.87 19 12 19C8.13 19 5 15.87 5 12V10H3V12C3 16.97 7.03 21 12 21C16.97 21 21 16.97 21 12V10H19Z" fill="currentColor"/>
+                <path d="M11 21H13V23H11V21Z" fill="currentColor"/>
+              </svg>
+            </button>
+            
+            {/* Send Button */}
             <button
               type="submit"
-              className="px-6 py-3 bg-gradient-to-r from-[#7c5cfc] to-[#fc5c7d] rounded-xl font-medium hover:shadow-lg hover:shadow-purple-500/20 transition-all"
+              className="px-5 py-3 bg-gradient-to-r from-[#7c5cfc] to-[#fc5c7d] rounded-xl font-medium hover:shadow-lg hover:shadow-purple-500/20 transition-all"
               data-testid="send-message-button"
             >
               Send
