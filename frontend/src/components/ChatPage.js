@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import SimplePeer from 'simple-peer';
 import PhotoViewer from './PhotoViewer';
 
-const ChatPage = ({ socket, partner, onClose }) => {
+const ChatPage = ({ socket, partner, onClose, onSkip }) => {
   const [messages, setMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState('');
   const [audioActive, setAudioActive] = useState(false);
@@ -12,6 +12,7 @@ const ChatPage = ({ socket, partner, onClose }) => {
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
   const [photoToView, setPhotoToView] = useState(null);
+  const [partnerDisconnected, setPartnerDisconnected] = useState(false);
   
   useEffect(() => {
     console.log('ChatPage mounted, setting up Socket.IO listeners');
