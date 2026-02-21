@@ -49,10 +49,6 @@ const Settings = () => {
     setTimeout(() => navigate('/'), 500);
   };
   
-  const toggleCountry = (country) => {
-    setExpandedCountry(expandedCountry === country ? null : country);
-  };
-  
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white pb-20" data-testid="settings-page">
       {/* Header */}
