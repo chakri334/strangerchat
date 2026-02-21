@@ -146,8 +146,11 @@ async def join_queue(sid, data):
     
     logger.info(f'User {sid} joined queue for {city}. Queue size: {len(waiting_queue[city])}')
     
-    # Try to match immediately
+    # Try to match immediately in same city
     await try_match(city)
+    
+    # If still waiting after 5 seconds, try matching with any city
+    asyncio.create_task(try_global_match_after_delay(sid, 5))
 
 @sio.event
 async def send_message(sid, data):
