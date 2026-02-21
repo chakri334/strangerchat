@@ -191,12 +191,17 @@ const ChatPage = ({ socket, partner, onClose, onSkip }) => {
   };
   
   const handleSkip = () => {
+    console.log('Skip clicked');
     socket.emit('skip_chat', {});
-    onClose();
-    toast.info('Finding new stranger...');
+    if (onSkip) {
+      onSkip(); // Triggers waiting page immediately
+    } else {
+      onClose();
+    }
   };
   
   const handleDisconnect = () => {
+    console.log('Disconnect clicked');
     socket.emit('disconnect_chat', { notify: true });
     onClose();
   };
