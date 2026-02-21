@@ -3,13 +3,14 @@ import { X, SkipForward, Image as ImageIcon, MessageCircle, AlertCircle } from '
 import { toast } from 'sonner';
 import SimplePeer from 'simple-peer';
 
-const ChatModal = ({ socket, partner, onClose, onPhotoView }) => {
+const ChatPage = ({ socket, partner, onClose }) => {
   const [messages, setMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState('');
   const [audioActive, setAudioActive] = useState(false);
   const [peer, setPeer] = useState(null);
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
+  const [photoToView, setPhotoToView] = useState(null);
   
   useEffect(() => {
     console.log('ChatModal mounted, setting up Socket.IO listeners');
