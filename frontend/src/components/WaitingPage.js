@@ -37,9 +37,9 @@ const WaitingPage = ({ onCancel }) => {
         
         {/* Text */}
         <h2 className="text-3xl font-bold mb-4" style={{ fontFamily: 'Syne, sans-serif' }} data-testid="searching-title">
-          Finding a stranger...
+          Finding someone to chat with...
         </h2>
-        <p className="text-gray-400 animate-pulse">Searching for someone to chat with</p>
+        <p className="text-gray-400 animate-pulse">Searching for your next connection</p>
         
         {/* Loading dots */}
         <div className="flex justify-center gap-2 mt-6">
