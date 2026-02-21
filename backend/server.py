@@ -304,7 +304,12 @@ async def broadcast_stats():
     await sio.emit('stats_update', stats)
 
 # Combine FastAPI and Socket.IO
-socket_app = socketio.ASGIApp(sio, app)
+# Socket.IO will handle requests to /api/socket.io/*
+socket_app = socketio.ASGIApp(
+    sio,
+    other_asgi_app=app,
+    socketio_path='/api/socket.io'
+)
 
 # Export for uvicorn
 app = socket_app
