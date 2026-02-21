@@ -161,7 +161,7 @@ const Home = () => {
     // Start searching immediately
     setIsSearching(true);
     socket.emit('join_queue', { city: userCity });
-    toast.info('Finding new stranger...');
+    toast.info('Finding new chat...');
   };
   
   const handleCancelSearch = () => {
