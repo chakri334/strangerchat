@@ -226,9 +226,9 @@ const ChatPage = ({ socket, partner, onClose, onSkip }) => {
           </div>
           <div>
             <div className="font-bold" data-testid="partner-name">{partner.name}</div>
-            <div className="text-xs text-green-400 flex items-center gap-1">
-              <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
-              Online
+            <div className={`text-xs flex items-center gap-1 ${partnerDisconnected ? 'text-red-400' : 'text-green-400'}`}>
+              <span className={`w-2 h-2 rounded-full ${partnerDisconnected ? 'bg-red-400' : 'bg-green-400 animate-pulse'}`}></span>
+              {partnerDisconnected ? 'Disconnected' : 'Online'}
             </div>
           </div>
         </div>
