@@ -44,6 +44,7 @@ const Home = () => {
     
     // Initialize socket
     const newSocket = io(BACKEND_URL, {
+      path: '/api/socket.io',
       transports: ['websocket', 'polling']
     });
     
