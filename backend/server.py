@@ -303,3 +303,6 @@ async def broadcast_stats():
 
 # Combine FastAPI and Socket.IO
 socket_app = socketio.ASGIApp(sio, app)
+
+# Export for uvicorn
+app = socket_app
