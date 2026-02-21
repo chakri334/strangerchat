@@ -136,6 +136,7 @@ const Home = () => {
       return;
     }
     
+    console.log('🔍 Joining queue for city:', userCity);
     setIsSearching(true);
     socket.emit('join_queue', { city: userCity });
     
@@ -143,7 +144,7 @@ const Home = () => {
     setTimeout(() => {
       if (isSearching && !chatActive) {
         setIsSearching(false);
-        toast.error('No users available. Try a different city.');
+        toast.error('No users available right now. Keep trying!');
       }
     }, 30000);
   };
