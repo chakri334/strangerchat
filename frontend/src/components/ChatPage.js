@@ -28,8 +28,16 @@ const ChatPage = ({ socket, partner, onClose, onSkip }) => {
     });
     
     socket.on('new_photo', (data) => {
-      toast.success('Partner sent a photo!');
-      setPhotoToView(data.photo);
+      console.log('📷 Received photo from partner');
+      // Add photo as a message instead of opening viewer immediately
+      setMessages((prev) => [...prev, {
+        type: 'photo',
+        photo: data.photo,
+        photo_id: data.photo_id,
+        from: 'partner',
+        timestamp: new Date()
+      }]);
+      toast.success('Partner sent a photo! Tap to view');
     });
     
     socket.on('random_topic', (data) => {
