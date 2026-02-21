@@ -337,10 +337,18 @@ async def try_match(city: str):
             # Find a user from any other city who's also waiting alone
             for other_city, other_users in waiting_queue.items():
                 if other_city != city and len(other_users) >= 1:
+                    user1_sid = waiting_queue[city][0]
+                    user2_sid = other_users[0]
+                    
+                    # CRITICAL: Prevent self-matching
+                    if user1_sid == user2_sid:
+                        print(f'[MATCH] ERROR: Attempted self-match prevented! {user1_sid}', flush=True)
+                        continue
+                    
                     print(f'[MATCH] Found cross-city match: {city} + {other_city}', flush=True)
                     # Match across cities
-                    user1_sid = waiting_queue[city].pop(0)
-                    user2_sid = other_users.pop(0)
+                    waiting_queue[city].pop(0)
+                    other_users.pop(0)
                     
                     # Clean up empty queues
                     if not waiting_queue[city]:
@@ -354,8 +362,19 @@ async def try_match(city: str):
     
     # Get two users from same city
     print(f'[MATCH] Matching two users from {city}', flush=True)
-    user1_sid = waiting_queue[city].pop(0)
-    user2_sid = waiting_queue[city].pop(0)
+    user1_sid = waiting_queue[city][0]
+    user2_sid = waiting_queue[city][1]
+    
+    # CRITICAL: Prevent self-matching
+    if user1_sid == user2_sid:
+        print(f'[MATCH] CRITICAL ERROR: Same user in queue twice! {user1_sid}', flush=True)
+        # Remove duplicate
+        waiting_queue[city].pop(0)
+        return
+    
+    # Pop both users
+    waiting_queue[city].pop(0)
+    waiting_queue[city].pop(0)
     
     print(f'[MATCH] Popped users: {user1_sid} and {user2_sid}', flush=True)
     
