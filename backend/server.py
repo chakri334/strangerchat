@@ -47,6 +47,16 @@ app.add_middleware(
     allow_headers=['*'],
 )
 
+@app.get('/health')
+async def health_check():
+    """Health check endpoint for deployment"""
+    return {
+        'status': 'healthy',
+        'service': 'chat-server',
+        'online_users': len(active_connections),
+        'active_chats': len(active_chats)
+    }
+
 @app.get('/api/')
 async def root():
     return {'message': 'Chat server running'}
