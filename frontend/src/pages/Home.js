@@ -67,10 +67,6 @@ const Home = () => {
     newSocket.on('stats_update', (data) => {
       console.log('Stats updated:', data);
       setStats(data);
-      if (data.city_counts) {
-        const cityList = Object.keys(data.city_counts);
-        setCities(['Global', ...cityList]);
-      }
     });
     
     newSocket.on('match_found', (data) => {
