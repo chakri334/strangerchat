@@ -333,7 +333,7 @@ const ChatPage = ({ socket, partner, onClose, onSkip }) => {
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="p-2.5 rounded-full bg-white/5 hover:bg-white/10 transition-colors"
+              className="flex-shrink-0 p-2.5 rounded-full bg-white/5 hover:bg-white/10 transition-colors"
               data-testid="share-photo-icon"
               title="Share Photo"
             >
@@ -346,7 +346,7 @@ const ChatPage = ({ socket, partner, onClose, onSkip }) => {
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
               placeholder="Type a message..."
-              className="flex-1 px-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#7c5cfc] transition-all"
+              className="flex-1 min-w-0 px-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#7c5cfc] transition-all"
               data-testid="message-input"
             />
             
@@ -354,7 +354,7 @@ const ChatPage = ({ socket, partner, onClose, onSkip }) => {
             <button
               type="button"
               onClick={toggleAudio}
-              className={`p-2.5 rounded-full transition-all ${
+              className={`flex-shrink-0 p-2.5 rounded-full transition-all ${
                 audioActive
                   ? 'bg-green-500/20 text-green-400 ring-2 ring-green-500/30'
                   : 'bg-white/5 text-gray-400 hover:bg-white/10'
@@ -372,8 +372,9 @@ const ChatPage = ({ socket, partner, onClose, onSkip }) => {
             {/* Send Button */}
             <button
               type="submit"
-              className="px-4 py-3 bg-gradient-to-r from-[#7c5cfc] to-[#fc5c7d] rounded-xl font-medium hover:shadow-lg hover:shadow-purple-500/20 transition-all"
+              className="flex-shrink-0 p-3 bg-gradient-to-r from-[#7c5cfc] to-[#fc5c7d] rounded-full hover:shadow-lg hover:shadow-purple-500/20 transition-all"
               data-testid="send-message-button"
+              title="Send"
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M2 21L23 12L2 3V10L17 12L2 14V21Z" fill="currentColor"/>
