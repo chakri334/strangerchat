@@ -184,7 +184,7 @@ const ChatModal = ({ socket, partner, onClose, onPhotoView }) => {
   const handleSkip = () => {
     socket.emit('skip_chat', {});
     onClose();
-    toast.info('Finding new stranger...');
+    toast.info('Finding new chat...');
   };
   
   const handleDisconnect = () => {
