@@ -159,17 +159,30 @@ async def handle_join_queue(sid, data):
         print(f'[SOCKET] User {sid} not registered, cannot join queue', flush=True)
         return
     
+    # CRITICAL: Check if user is already in a chat
+    if sid in user_rooms:
+        print(f'[SOCKET] User {sid} already in a chat, cannot join queue', flush=True)
+        return
+    
     # Update user city
     active_connections[sid]['city'] = city
+    
+    # Remove user from ALL queues first (prevent duplicates across cities)
+    for queue_city, users in list(waiting_queue.items()):
+        if sid in users:
+            users.remove(sid)
+            print(f'[SOCKET] Removed {sid} from {queue_city} queue to prevent duplicate', flush=True)
+            if not users:
+                del waiting_queue[queue_city]
     
     # Add to waiting queue
     if city not in waiting_queue:
         waiting_queue[city] = []
     
-    if sid not in waiting_queue[city]:
-        waiting_queue[city].append(sid)
+    waiting_queue[city].append(sid)
     
     print(f'[SOCKET] User {sid} joined queue for {city}. Queue size: {len(waiting_queue[city])}', flush=True)
+    print(f'[SOCKET] Current queue for {city}: {waiting_queue[city]}', flush=True)
     logger.info(f'User {sid} joined queue for {city}. Queue size: {len(waiting_queue[city])}')
     
     # Try to match immediately in same city
