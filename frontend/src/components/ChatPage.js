@@ -345,7 +345,7 @@ const ChatPage = ({ socket, partner, onClose, onSkip }) => {
             <p className="text-gray-400 mb-4">Chat ended. Messages are view-only.</p>
             <button
               onClick={() => {
-                console.log('Find New Stranger clicked');
+                console.log('Find New Chat clicked');
                 if (onSkip && typeof onSkip === 'function') {
                   onSkip();
                 } else if (onClose) {
