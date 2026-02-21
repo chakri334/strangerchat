@@ -76,14 +76,15 @@ async def get_stats():
 
 # Socket.IO events
 @sio.event
-async def connect(sid):
+async def connect(sid, environ):
     print(f'[SOCKET] Client connected: {sid}', flush=True)
     logger.info(f'Client connected: {sid}')
     # Send stats immediately
     await broadcast_stats()
-    
-@sio.event
+
+@sio.event  
 async def disconnect(sid):
+    print(f'[SOCKET] Client disconnected: {sid}', flush=True)
     logger.info(f'Client disconnected: {sid}')
     
     # Remove from active connections
@@ -118,8 +119,9 @@ async def disconnect(sid):
     # Broadcast updated stats
     await broadcast_stats()
 
-@sio.event
-async def register_user(sid, data):
+@sio.on('register_user')
+async def handle_register_user(sid, data):
+    print(f'[SOCKET] register_user event received from {sid}', flush=True)
     name = data.get('name', 'Anonymous')
     age = data.get('age', '')
     gender = data.get('gender', '')
@@ -145,8 +147,9 @@ async def register_user(sid, data):
     await sio.emit('registered', {'success': True}, room=sid)
     await broadcast_stats()
 
-@sio.event
-async def join_queue(sid, data):
+@sio.on('join_queue')
+async def handle_join_queue(sid, data):
+    print(f'[SOCKET] join_queue event received from {sid}', flush=True)
     city = data.get('city', 'Unknown')
     
     print(f'[SOCKET] User {sid} joining queue for {city}', flush=True)
@@ -175,8 +178,8 @@ async def join_queue(sid, data):
     # If still waiting after 5 seconds, try matching with any city
     asyncio.create_task(try_global_match_after_delay(sid, 5))
 
-@sio.event
-async def send_message(sid, data):
+@sio.on('send_message')
+async def handle_send_message(sid, data):
     if sid not in user_rooms:
         return
     
@@ -194,8 +197,8 @@ async def send_message(sid, data):
                 'from': 'partner'
             }, room=partner_sid[0])
 
-@sio.event
-async def send_photo(sid, data):
+@sio.on('send_photo')
+async def handle_send_photo(sid, data):
     if sid not in user_rooms:
         return
     
@@ -215,17 +218,17 @@ async def send_photo(sid, data):
             # Schedule auto-delete after 30 seconds
             asyncio.create_task(delete_photo_after_delay(photo_id, 30))
 
-@sio.event
-async def skip_chat(sid, data):
+@sio.on('skip_chat')
+async def handle_skip_chat(sid, data):
     await disconnect_chat(sid, notify_partner=True)
     
     # Rejoin queue immediately
     if sid in active_connections:
         city = active_connections[sid]['city']
-        await join_queue(sid, {'city': city})
+        await handle_join_queue(sid, {'city': city})
 
-@sio.event
-async def disconnect_chat(sid, data=None):
+@sio.on('disconnect_chat')
+async def handle_disconnect_chat(sid, data=None):
     notify = data.get('notify', True) if data else True
     
     if sid in user_rooms:
@@ -247,8 +250,8 @@ async def disconnect_chat(sid, data=None):
     
     await sio.emit('chat_ended', room=sid)
 
-@sio.event
-async def audio_signal(sid, data):
+@sio.on('audio_signal')
+async def handle_audio_signal(sid, data):
     if sid not in user_rooms:
         return
     
@@ -259,8 +262,8 @@ async def audio_signal(sid, data):
         if partner_sid:
             await sio.emit('audio_signal', data, room=partner_sid[0])
 
-@sio.event
-async def get_random_topic(sid, data):
+@sio.on('get_random_topic')
+async def handle_get_random_topic(sid, data):
     topics = [
         'What\'s your favorite movie?',
         'If you could travel anywhere, where would it be?',
