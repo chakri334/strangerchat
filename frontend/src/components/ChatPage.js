@@ -13,7 +13,7 @@ const ChatPage = ({ socket, partner, onClose }) => {
   const [photoToView, setPhotoToView] = useState(null);
   
   useEffect(() => {
-    console.log('ChatModal mounted, setting up Socket.IO listeners');
+    console.log('ChatPage mounted, setting up Socket.IO listeners');
     
     // Socket listeners
     socket.on('new_message', (data) => {
@@ -27,7 +27,7 @@ const ChatPage = ({ socket, partner, onClose }) => {
     
     socket.on('new_photo', (data) => {
       toast.success('Partner sent a photo!');
-      onPhotoView(data.photo);
+      setPhotoToView(data.photo);
     });
     
     socket.on('random_topic', (data) => {
@@ -43,7 +43,7 @@ const ChatPage = ({ socket, partner, onClose }) => {
     });
     
     return () => {
-      console.log('ChatModal unmounting, removing listeners');
+      console.log('ChatPage unmounting, removing listeners');
       socket.off('new_message');
       socket.off('new_photo');
       socket.off('random_topic');
