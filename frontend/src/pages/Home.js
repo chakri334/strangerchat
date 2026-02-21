@@ -2,8 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import { toast } from 'sonner';
-import ChatModal from '../components/ChatModal';
-import PhotoViewer from '../components/PhotoViewer';
+import ChatPage from '../components/ChatPage';
+import WaitingPage from '../components/WaitingPage';
 import { Settings as SettingsIcon } from 'lucide-react';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
@@ -12,7 +12,6 @@ const Home = () => {
   const navigate = useNavigate();
   const [socket, setSocket] = useState(null);
   const [userCity, setUserCity] = useState('Global');
-  const [cities, setCities] = useState(['Global', 'New York', 'London', 'Tokyo', 'Mumbai', 'Sydney']);
   const [stats, setStats] = useState({ online: 0, chats_today: 0, cities: 0 });
   const [isSearching, setIsSearching] = useState(false);
   const [chatActive, setChatActive] = useState(false);
