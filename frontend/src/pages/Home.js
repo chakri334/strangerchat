@@ -144,25 +144,34 @@ const Home = () => {
     }, 30000);
   };
   
-  const handleCitySelect = (city) => {
-    setUserCity(city);
-    localStorage.setItem('userCity', city);
-    if (socket) {
-      socket.emit('register_user', {
-        name: userName,
-        age: userAge,
-        gender: userGender,
-        city: city
-      });
-    }
-  };
-  
   const handleCloseChat = () => {
     setChatActive(false);
     setPartner(null);
     setIsSearching(false);
   };
+  
+  const handleCancelSearch = () => {
+    setIsSearching(false);
+    // Could emit a leave_queue event if needed
+  };
 
+  // Show waiting page when searching
+  if (isSearching && !chatActive) {
+    return <WaitingPage onCancel={handleCancelSearch} />;
+  }
+  
+  // Show full-screen chat when matched
+  if (chatActive && partner && socket) {
+    return (
+      <ChatPage
+        socket={socket}
+        partner={partner}
+        onClose={handleCloseChat}
+      />
+    );
+  }
+
+  // Show home page
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white relative overflow-hidden" data-testid="home-page">
       {/* Gradient background */}
