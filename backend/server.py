@@ -149,8 +149,11 @@ async def register_user(sid, data):
 async def join_queue(sid, data):
     city = data.get('city', 'Unknown')
     
+    print(f'[SOCKET] User {sid} joining queue for {city}', flush=True)
+    
     if sid not in active_connections:
         await sio.emit('error', {'message': 'Please register first'}, room=sid)
+        print(f'[SOCKET] User {sid} not registered, cannot join queue', flush=True)
         return
     
     # Update user city
@@ -163,6 +166,7 @@ async def join_queue(sid, data):
     if sid not in waiting_queue[city]:
         waiting_queue[city].append(sid)
     
+    print(f'[SOCKET] User {sid} joined queue for {city}. Queue size: {len(waiting_queue[city])}', flush=True)
     logger.info(f'User {sid} joined queue for {city}. Queue size: {len(waiting_queue[city])}')
     
     # Try to match immediately in same city
