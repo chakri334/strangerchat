@@ -294,6 +294,20 @@ const ChatPage = ({ socket, partner, onClose, onSkip }) => {
       
       {/* Input Area */}
       <div className="p-4 border-t border-white/10">
+        {partnerDisconnected ? (
+          /* Partner Disconnected - Show message and reconnect option */
+          <div className="text-center py-6">
+            <p className="text-gray-400 mb-4">Stranger disconnected. Messages are view-only.</p>
+            <button
+              onClick={onSkip}
+              className="px-6 py-3 bg-gradient-to-r from-[#7c5cfc] to-[#fc5c7d] rounded-xl font-medium hover:shadow-lg hover:shadow-purple-500/20 transition-all"
+              data-testid="find-new-button"
+            >
+              Find New Stranger
+            </button>
+          </div>
+        ) : (
+          <>
           {/* Main Action Buttons - Smaller and cleaner */}
           <div className="flex gap-2 mb-3">
             <button
