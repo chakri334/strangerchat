@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 
 const PhotoViewer = ({ photo, onClose }) => {
-  const [timeLeft, setTimeLeft] = useState(30);
+  const [timeLeft, setTimeLeft] = useState(15);
   const [isBlurred, setIsBlurred] = useState(false);
   
   useEffect(() => {
