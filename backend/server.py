@@ -180,22 +180,33 @@ async def handle_join_queue(sid, data):
 
 @sio.on('send_message')
 async def handle_send_message(sid, data):
+    print(f'[MESSAGE] Received message from {sid}', flush=True)
+    
     if sid not in user_rooms:
+        print(f'[MESSAGE] User {sid} not in any room!', flush=True)
         return
     
     room_id = user_rooms[sid]
     message = data.get('message', '')
     timestamp = datetime.now(timezone.utc).isoformat()
     
+    print(f'[MESSAGE] User {sid} in room {room_id} sending: "{message}"', flush=True)
+    
     # Send to partner only
     if room_id in active_chats:
         partner_sid = [s for s in active_chats[room_id] if s != sid]
         if partner_sid:
+            print(f'[MESSAGE] Sending to partner {partner_sid[0]}', flush=True)
             await sio.emit('new_message', {
                 'message': message,
                 'timestamp': timestamp,
                 'from': 'partner'
             }, room=partner_sid[0])
+            print(f'[MESSAGE] Message sent successfully to {partner_sid[0]}', flush=True)
+        else:
+            print(f'[MESSAGE] No partner found in room {room_id}', flush=True)
+    else:
+        print(f'[MESSAGE] Room {room_id} not in active_chats', flush=True)
 
 @sio.on('send_photo')
 async def handle_send_photo(sid, data):
