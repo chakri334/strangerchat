@@ -27,12 +27,13 @@ active_chats: Dict[str, List[str]] = {}  # room_id -> [socket_id1, socket_id2]
 user_rooms: Dict[str, str] = {}  # socket_id -> room_id
 photo_timers: Dict[str, dict] = {}  # room_id -> {photo_data, timestamp}
 
-# Socket.IO server
+# Socket.IO server with custom path
 sio = socketio.AsyncServer(
     async_mode='asgi',
     cors_allowed_origins='*',
     logger=False,
-    engineio_logger=False
+    engineio_logger=False,
+    path='/api/socket.io'
 )
 
 # FastAPI app
