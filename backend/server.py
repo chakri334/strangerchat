@@ -292,12 +292,17 @@ async def handle_get_random_topic(sid, data):
 
 # Helper functions
 async def try_match(city: str):
+    print(f'[MATCH] try_match called for city: {city}', flush=True)
+    print(f'[MATCH] Current queue for {city}: {waiting_queue.get(city, [])}', flush=True)
+    
     if city not in waiting_queue or len(waiting_queue[city]) < 2:
+        print(f'[MATCH] Not enough users in {city} (need 2, have {len(waiting_queue.get(city, []))})', flush=True)
         # If less than 2 users in this city, try to match with any available user from other cities
         if city in waiting_queue and len(waiting_queue[city]) == 1:
             # Find a user from any other city who's also waiting alone
             for other_city, other_users in waiting_queue.items():
                 if other_city != city and len(other_users) >= 1:
+                    print(f'[MATCH] Found cross-city match: {city} + {other_city}', flush=True)
                     # Match across cities
                     user1_sid = waiting_queue[city].pop(0)
                     user2_sid = other_users.pop(0)
@@ -313,8 +318,11 @@ async def try_match(city: str):
         return
     
     # Get two users from same city
+    print(f'[MATCH] Matching two users from {city}', flush=True)
     user1_sid = waiting_queue[city].pop(0)
     user2_sid = waiting_queue[city].pop(0)
+    
+    print(f'[MATCH] Popped users: {user1_sid} and {user2_sid}', flush=True)
     
     # Clean up empty queue
     if not waiting_queue[city]:
