@@ -291,7 +291,6 @@ const ChatPage = ({ socket, partner, onClose, onSkip }) => {
                       <div className="text-white text-center">
                         <ImageIcon size={32} className="mx-auto mb-2" />
                         <p className="text-sm font-medium">Tap to view</p>
-                        <p className="text-xs opacity-75">15s timer</p>
                       </div>
                     </div>
                   </div>
