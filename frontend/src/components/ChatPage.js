@@ -208,7 +208,7 @@ const ChatPage = ({ socket, partner, onClose, onSkip }) => {
       onSkip();
     } else {
       console.log('onSkip not available, calling onClose()');
-      toast.info('Finding new stranger...');
+      toast.info('Finding new chat...');
       onClose();
     }
   };
