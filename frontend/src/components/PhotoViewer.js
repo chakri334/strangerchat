@@ -48,7 +48,7 @@ const PhotoViewer = ({ photo, onClose }) => {
     };
   }, [onClose]);
   
-  const progress = (timeLeft / 30) * 100;
+  const progress = (timeLeft / 15) * 100;
   
   return (
     <div 
@@ -56,35 +56,7 @@ const PhotoViewer = ({ photo, onClose }) => {
       onContextMenu={(e) => e.preventDefault()}
       data-testid="photo-viewer"
     >
-      {/* Timer Ring */}
-      <div className="absolute top-8 right-8">
-        <div className="relative w-16 h-16">
-          <svg className="transform -rotate-90 w-16 h-16">
-            <circle
-              cx="32"
-              cy="32"
-              r="28"
-              stroke="#333"
-              strokeWidth="4"
-              fill="none"
-            />
-            <circle
-              cx="32"
-              cy="32"
-              r="28"
-              stroke="#7c5cfc"
-              strokeWidth="4"
-              fill="none"
-              strokeDasharray={`${2 * Math.PI * 28}`}
-              strokeDashoffset={`${2 * Math.PI * 28 * (1 - progress / 100)}`}
-              className="transition-all duration-1000"
-            />
-          </svg>
-          <div className="absolute inset-0 flex items-center justify-center text-white font-bold" data-testid="timer-countdown">
-            {timeLeft}
-          </div>
-        </div>
-      </div>
+      {/* Timer Ring - Hidden but functional */}
       
       {/* Close Button */}
       <button
