@@ -226,8 +226,8 @@ async def handle_send_photo(sid, data):
                 'photo_id': photo_id
             }, room=partner_sid[0])
             
-            # Schedule auto-delete after 30 seconds
-            asyncio.create_task(delete_photo_after_delay(photo_id, 30))
+            # Schedule auto-delete after 15 seconds
+            asyncio.create_task(delete_photo_after_delay(photo_id, 15))
 
 @sio.on('skip_chat')
 async def handle_skip_chat(sid, data):
