@@ -269,18 +269,51 @@ const ChatPage = ({ socket, partner, onClose, onSkip }) => {
               className={`flex ${msg.from === 'me' ? 'justify-end' : 'justify-start'}`}
               data-testid={`message-${msg.from}`}
             >
-              <div
-                className={`max-w-[75%] px-4 py-2 rounded-2xl ${
-                  msg.from === 'me'
-                    ? 'bg-gradient-to-r from-[#7c5cfc] to-[#fc5c7d] text-white'
-                    : 'bg-white/10 text-white'
-                }`}
-              >
-                <p className="break-words">{msg.text}</p>
-                <p className="text-xs opacity-60 mt-1">
-                  {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </p>
-              </div>
+              {msg.type === 'photo' ? (
+                /* Photo Message */
+                <div
+                  onClick={() => {
+                    setPhotoToView(msg.photo);
+                  }}
+                  className={`max-w-[75%] cursor-pointer hover:opacity-90 transition-opacity ${
+                    msg.from === 'me'
+                      ? 'bg-gradient-to-r from-[#7c5cfc] to-[#fc5c7d]'
+                      : 'bg-white/10'
+                  } rounded-2xl overflow-hidden`}
+                >
+                  <div className="relative">
+                    <img 
+                      src={msg.photo} 
+                      alt="Shared" 
+                      className="w-48 h-48 object-cover blur-sm"
+                    />
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                      <div className="text-white text-center">
+                        <ImageIcon size={32} className="mx-auto mb-2" />
+                        <p className="text-sm font-medium">Tap to view</p>
+                        <p className="text-xs opacity-75">15s timer</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="px-3 py-1 text-xs opacity-60">
+                    {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </div>
+                </div>
+              ) : (
+                /* Text Message */
+                <div
+                  className={`max-w-[75%] px-4 py-2 rounded-2xl ${
+                    msg.from === 'me'
+                      ? 'bg-gradient-to-r from-[#7c5cfc] to-[#fc5c7d] text-white'
+                      : 'bg-white/10 text-white'
+                  }`}
+                >
+                  <p className="break-words">{msg.text}</p>
+                  <p className="text-xs opacity-60 mt-1">
+                    {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                </div>
+              )}
             </div>
           ))}
           <div ref={messagesEndRef} />
