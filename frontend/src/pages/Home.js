@@ -242,50 +242,7 @@ const Home = () => {
             </div>
           </div>
         </div>
-        
-        {/* Bottom Nav */}
-        <nav className="fixed bottom-0 left-0 right-0 bg-[#0a0a0a]/90 backdrop-blur-lg border-t border-white/10">
-          <div className="flex justify-around items-center h-16 max-w-2xl mx-auto px-6">
-            <button
-              onClick={() => navigate('/')}
-              className="flex flex-col items-center gap-1 text-[#7c5cfc]"
-              data-testid="nav-connect"
-            >
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
-                <circle cx="12" cy="12" r="3" fill="currentColor"/>
-              </svg>
-              <span className="text-xs">Connect</span>
-            </button>
-            <button
-              onClick={() => navigate('/settings')}
-              className="flex flex-col items-center gap-1 text-gray-400 hover:text-white transition-colors"
-              data-testid="nav-settings"
-            >
-              <SettingsIcon size={24} />
-              <span className="text-xs">Settings</span>
-            </button>
-          </div>
-        </nav>
       </div>
-      
-      {/* Chat Modal */}
-      {chatActive && partner && socket && (
-        <ChatModal
-          socket={socket}
-          partner={partner}
-          onClose={handleCloseChat}
-          onPhotoView={setPhotoToView}
-        />
-      )}
-      
-      {/* Photo Viewer */}
-      {photoToView && (
-        <PhotoViewer
-          photo={photoToView}
-          onClose={() => setPhotoToView(null)}
-        />
-      )}
     </div>
   );
 };
