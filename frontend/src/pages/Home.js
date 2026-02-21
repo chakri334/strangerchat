@@ -199,7 +199,7 @@ const Home = () => {
         {/* Header */}
         <header className="p-6 flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold" style={{ fontFamily: 'Syne, sans-serif' }} data-testid="app-logo">stranger chat</h1>
+            <h1 className="text-3xl font-bold" style={{ fontFamily: 'Syne, sans-serif' }} data-testid="app-logo">stumble chat</h1>
             <p className="text-sm text-gray-400 mt-1" data-testid="online-count">{stats.online} online</p>
           </div>
           <button
