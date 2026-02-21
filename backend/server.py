@@ -125,6 +125,7 @@ async def register_user(sid, data):
     gender = data.get('gender', '')
     city = data.get('city', 'Global')
     
+    print(f'[SOCKET] Registering user {sid}: name={name}, city={city}', flush=True)
     logger.info(f'Registering user {sid}: name={name}, city={city}')
     
     active_connections[sid] = {
@@ -138,6 +139,7 @@ async def register_user(sid, data):
     # Update city count
     city_users[city] = city_users.get(city, 0) + 1
     
+    print(f'[SOCKET] User {sid} registered in {city}. Total in city: {city_users[city]}', flush=True)
     logger.info(f'User {sid} registered successfully in {city}. Total in city: {city_users[city]}')
     
     await sio.emit('registered', {'success': True}, room=sid)
