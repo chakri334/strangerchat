@@ -132,8 +132,12 @@ const Home = () => {
     }
     
     console.log('🔍 Joining queue for city:', userCity);
+    console.log('Socket connected:', socket.connected);
+    console.log('Socket ID:', socket.id);
+    
     setIsSearching(true);
     socket.emit('join_queue', { city: userCity });
+    console.log('✓ Emitted join_queue event');
     
     // Timeout after 30 seconds
     setTimeout(() => {
