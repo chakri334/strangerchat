@@ -73,11 +73,11 @@ const Home = () => {
       setIsSearching(false);
       setPartner(data.partner);
       setChatActive(true);
-      toast.success('Connected to a stranger!');
+      toast.success('Connected to someone!');
     });
     
     newSocket.on('partner_disconnected', () => {
-      toast.info('Stranger disconnected');
+      toast.info('Chat partner disconnected');
       setChatActive(false);
       setPartner(null);
     });
