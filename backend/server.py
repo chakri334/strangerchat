@@ -31,8 +31,8 @@ photo_timers: Dict[str, dict] = {}  # room_id -> {photo_data, timestamp}
 sio = socketio.AsyncServer(
     async_mode='asgi',
     cors_allowed_origins='*',
-    logger=True,
-    engineio_logger=True,
+    logger=False,
+    engineio_logger=False,
     transports=['polling']
 )
 
