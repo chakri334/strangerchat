@@ -10,20 +10,6 @@ const Settings = () => {
   const [gender, setGender] = useState('');
   const [genderLocked, setGenderLocked] = useState(false);
   const [selectedCity, setSelectedCity] = useState('Global');
-  const [expandedCountry, setExpandedCountry] = useState(null);
-  
-  const citiesByCountry = {
-    'Global': ['Global'],
-    'United States': ['New York', 'Los Angeles', 'Chicago', 'Houston', 'Miami'],
-    'United Kingdom': ['London', 'Manchester', 'Birmingham', 'Edinburgh'],
-    'India': ['Mumbai', 'Delhi', 'Bangalore', 'Kolkata', 'Chennai'],
-    'Japan': ['Tokyo', 'Osaka', 'Kyoto', 'Yokohama'],
-    'Australia': ['Sydney', 'Melbourne', 'Brisbane', 'Perth'],
-    'Canada': ['Toronto', 'Vancouver', 'Montreal', 'Calgary'],
-    'Germany': ['Berlin', 'Munich', 'Hamburg', 'Frankfurt'],
-    'France': ['Paris', 'Lyon', 'Marseille', 'Toulouse'],
-    'Brazil': ['São Paulo', 'Rio de Janeiro', 'Brasília', 'Salvador']
-  };
   
   useEffect(() => {
     // Load saved data
