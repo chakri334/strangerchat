@@ -277,10 +277,11 @@ const ChatPage = ({ socket, partner, onClose }) => {
             <AlertCircle size={12} />
             Report
           </button>
-        </div>
-        
-        {/* Input Area */}
-        <div className="p-4 border-t border-white/10">
+        </button>
+      </div>
+      
+      {/* Input Area */}
+      <div className="p-4 border-t border-white/10">
           {/* Main Action Buttons - Smaller and cleaner */}
           <div className="flex gap-2 mb-3">
             <button
