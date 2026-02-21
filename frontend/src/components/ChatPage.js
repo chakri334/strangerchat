@@ -342,7 +342,7 @@ const ChatPage = ({ socket, partner, onClose, onSkip }) => {
         {partnerDisconnected ? (
           /* Partner Disconnected - Show message and reconnect option */
           <div className="text-center py-6">
-            <p className="text-gray-400 mb-4">Stranger disconnected. Messages are view-only.</p>
+            <p className="text-gray-400 mb-4">Chat ended. Messages are view-only.</p>
             <button
               onClick={() => {
                 console.log('Find New Stranger clicked');
@@ -355,7 +355,7 @@ const ChatPage = ({ socket, partner, onClose, onSkip }) => {
               className="px-6 py-3 bg-gradient-to-r from-[#7c5cfc] to-[#fc5c7d] rounded-xl font-medium hover:shadow-lg hover:shadow-purple-500/20 transition-all"
               data-testid="find-new-button"
             >
-              Find New Stranger
+              Find New Chat
             </button>
           </div>
         ) : (
