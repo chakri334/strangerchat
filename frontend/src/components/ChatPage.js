@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { X, SkipForward, Image as ImageIcon, MessageCircle, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import SimplePeer from 'simple-peer';
+import PhotoViewer from './PhotoViewer';
 
 const ChatPage = ({ socket, partner, onClose }) => {
   const [messages, setMessages] = useState([]);
