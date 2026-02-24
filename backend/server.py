@@ -433,6 +433,72 @@ async def handle_get_random_topic(sid, data):
     
     await sio.emit('random_topic', {'topic': random.choice(topics)}, room=sid)
 
+@sio.on('report_user')
+async def handle_report_user(sid, data):
+    """Handle user report with chat history"""
+    if sid not in user_rooms:
+        return
+    
+    room_id = user_rooms[sid]
+    comment = data.get('comment', '')
+    chat_history = data.get('chat_history', [])
+    
+    if room_id not in active_chats:
+        return
+    
+    # Get reported user's SID and IP
+    partner_sid = [s for s in active_chats[room_id] if s != sid]
+    if not partner_sid:
+        return
+    
+    reported_sid = partner_sid[0]
+    reported_ip = user_ip_map.get(reported_sid, 'unknown')
+    reporter_ip = user_ip_map.get(sid, 'unknown')
+    
+    # Create report record
+    report = {
+        'id': str(uuid.uuid4()),
+        'reported_sid': reported_sid,
+        'reported_ip': reported_ip,
+        'reporter_sid': sid,
+        'reporter_ip': reporter_ip,
+        'comment': comment,
+        'chat_history': chat_history,
+        'room_id': room_id,
+        'timestamp': datetime.now(timezone.utc).isoformat()
+    }
+    reports.append(report)
+    
+    # Track reports per IP
+    if reported_ip != 'unknown':
+        ip_report_count[reported_ip] = ip_report_count.get(reported_ip, 0) + 1
+        
+        # Check if user should be blocked (3+ reports)
+        if ip_report_count[reported_ip] >= 3:
+            # Block for 3 days
+            block_until = datetime.now(timezone.utc) + timedelta(days=3)
+            ip_blocks[reported_ip] = block_until
+            
+            print(f'[REPORT] IP {reported_ip} blocked until {block_until}', flush=True)
+            logger.info(f'IP {reported_ip} blocked for 3 days due to multiple reports')
+            
+            # Notify and disconnect the reported user
+            await sio.emit('blocked', {
+                'message': 'You have been blocked due to multiple reports.'
+            }, room=reported_sid)
+            
+            # Disconnect them
+            await sio.disconnect(reported_sid)
+    
+    print(f'[REPORT] User {reported_sid} reported by {sid}. IP: {reported_ip}, Total reports: {ip_report_count.get(reported_ip, 1)}', flush=True)
+    logger.info(f'User reported: {reported_sid} (IP: {reported_ip})')
+    
+    # Notify reporter
+    await sio.emit('report_submitted', {
+        'success': True,
+        'message': 'Report submitted successfully.'
+    }, room=sid)
+
 # Helper functions
 async def try_match(city: str):
     print(f'[MATCH] try_match called for city: {city}', flush=True)
