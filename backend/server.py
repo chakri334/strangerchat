@@ -74,6 +74,32 @@ async def health_check():
 async def root():
     return {'message': 'Chat server running'}
 
+@app.get('/api/check-ip')
+async def check_ip_block(request: Request):
+    """Check if an IP is blocked"""
+    client_ip = request.headers.get('x-forwarded-for', request.client.host)
+    if ',' in client_ip:
+        client_ip = client_ip.split(',')[0].strip()
+    
+    # Clean up expired blocks
+    now = datetime.now(timezone.utc)
+    expired = [ip for ip, expires in ip_blocks.items() if expires < now]
+    for ip in expired:
+        del ip_blocks[ip]
+        if ip in ip_report_count:
+            del ip_report_count[ip]
+    
+    if client_ip in ip_blocks:
+        remaining = ip_blocks[client_ip] - now
+        hours_remaining = int(remaining.total_seconds() // 3600)
+        return {
+            'blocked': True,
+            'hours_remaining': hours_remaining,
+            'message': f'You are temporarily blocked. Try again in {hours_remaining} hours.'
+        }
+    
+    return {'blocked': False}
+
 @app.get('/api/stats')
 async def get_stats():
     total_online = len(active_connections)
