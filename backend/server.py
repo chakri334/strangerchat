@@ -564,7 +564,7 @@ async def create_match(user1_sid: str, user2_sid: str):
     
     # Prevent self-matching
     if user1_sid == user2_sid:
-        print(f'[MATCH] ERROR: Cannot match user with themselves!', flush=True)
+        print('[MATCH] ERROR: Cannot match user with themselves!', flush=True)
         return
     
     # Create room
