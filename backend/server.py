@@ -118,6 +118,23 @@ async def get_stats():
 async def connect(sid, environ):
     print(f'[SOCKET] Client connected: {sid}', flush=True)
     logger.info(f'Client connected: {sid}')
+    
+    # Extract and store IP address
+    client_ip = environ.get('HTTP_X_FORWARDED_FOR', environ.get('REMOTE_ADDR', 'unknown'))
+    if ',' in str(client_ip):
+        client_ip = client_ip.split(',')[0].strip()
+    user_ip_map[sid] = client_ip
+    
+    # Check if IP is blocked
+    now = datetime.now(timezone.utc)
+    if client_ip in ip_blocks and ip_blocks[client_ip] > now:
+        print(f'[SOCKET] Blocked IP attempted connection: {client_ip}', flush=True)
+        await sio.emit('blocked', {
+            'message': 'You are temporarily blocked due to reports.'
+        }, room=sid)
+        await sio.disconnect(sid)
+        return False
+    
     # Send stats immediately
     await broadcast_stats()
 
