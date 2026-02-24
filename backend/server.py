@@ -626,9 +626,27 @@ async def try_global_match_after_delay(sid: str, delay: int):
                             return
 
 async def delete_photo_after_delay(photo_id: str, delay: int):
+    """Delete photo after delay and notify both users"""
     await asyncio.sleep(delay)
-    # Photo is already sent and handled client-side
-    logger.info(f'Photo {photo_id} expired')
+    
+    if photo_id in photo_messages:
+        photo_info = photo_messages[photo_id]
+        sender_sid = photo_info['sender_sid']
+        receiver_sid = photo_info['receiver_sid']
+        
+        # Notify both users that photo has been deleted
+        await sio.emit('photo_deleted', {
+            'photo_id': photo_id
+        }, room=sender_sid)
+        
+        await sio.emit('photo_deleted', {
+            'photo_id': photo_id
+        }, room=receiver_sid)
+        
+        # Clean up
+        del photo_messages[photo_id]
+        
+    logger.info(f'Photo {photo_id} expired and deleted')
 
 async def broadcast_stats():
     stats = {
