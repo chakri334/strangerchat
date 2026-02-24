@@ -172,6 +172,10 @@ async def disconnect(sid):
         
         del active_connections[sid]
     
+    # Clean up IP mapping
+    if sid in user_ip_map:
+        del user_ip_map[sid]
+    
     # Broadcast updated stats
     await broadcast_stats()
 
