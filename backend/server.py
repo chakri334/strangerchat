@@ -294,13 +294,61 @@ async def handle_send_photo(sid, data):
         partner_sid = [s for s in active_chats[room_id] if s != sid]
         if partner_sid:
             photo_id = str(uuid.uuid4())
+            
+            # Store photo tracking info
+            photo_messages[photo_id] = {
+                'sender_sid': sid,
+                'receiver_sid': partner_sid[0],
+                'room_id': room_id,
+                'photo': photo_data,
+                'opened': False,
+                'timer_started': False,
+                'created_at': datetime.now(timezone.utc)
+            }
+            
+            # Notify sender that photo was sent (show as thumbnail)
+            await sio.emit('photo_sent', {
+                'photo': photo_data,
+                'photo_id': photo_id
+            }, room=sid)
+            
+            # Notify receiver
             await sio.emit('new_photo', {
                 'photo': photo_data,
                 'photo_id': photo_id
             }, room=partner_sid[0])
-            
-            # Schedule auto-delete after 15 seconds
-            asyncio.create_task(delete_photo_after_delay(photo_id, 15))
+
+@sio.on('photo_opened')
+async def handle_photo_opened(sid, data):
+    """Handle when a user opens a photo - start 15s timer for both"""
+    photo_id = data.get('photo_id')
+    
+    if photo_id not in photo_messages:
+        return
+    
+    photo_info = photo_messages[photo_id]
+    
+    # Mark as opened and start timer if not already started
+    if not photo_info['timer_started']:
+        photo_info['opened'] = True
+        photo_info['timer_started'] = True
+        
+        # Notify both users that timer has started
+        sender_sid = photo_info['sender_sid']
+        receiver_sid = photo_info['receiver_sid']
+        
+        await sio.emit('photo_timer_started', {
+            'photo_id': photo_id,
+            'duration': 15
+        }, room=sender_sid)
+        
+        await sio.emit('photo_timer_started', {
+            'photo_id': photo_id,
+            'duration': 15
+        }, room=receiver_sid)
+        
+        # Schedule deletion after 15 seconds
+        asyncio.create_task(delete_photo_after_delay(photo_id, 15))
 
 @sio.on('skip_chat')
 async def handle_skip_chat(sid, data):
