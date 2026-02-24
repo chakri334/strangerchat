@@ -245,9 +245,21 @@ const ChatPage = ({ socket, partner, onClose, onSkip }) => {
     reader.onload = (event) => {
       const base64 = event.target.result;
       socket.emit('send_photo', { photo: base64 });
-      toast.success('Photo sent!');
+      // Don't add to local messages - server will send photo_sent event
     };
     reader.readAsDataURL(file);
+  };
+  
+  const handleOpenPhoto = (photo, photoId) => {
+    setPhotoToView(photo);
+    setViewingPhotoId(photoId);
+    // Notify server that photo was opened (starts the 15s timer)
+    socket.emit('photo_opened', { photo_id: photoId });
+  };
+  
+  const handleClosePhotoViewer = () => {
+    setPhotoToView(null);
+    setViewingPhotoId(null);
   };
   
   const handleSkip = () => {
