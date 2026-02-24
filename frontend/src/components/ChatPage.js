@@ -30,17 +30,56 @@ const ChatPage = ({ socket, partner, onClose, onSkip }) => {
       }]);
     });
     
+    // Received photo from partner
     socket.on('new_photo', (data) => {
       console.log('📷 Received photo from partner');
-      // Add photo as a message instead of opening viewer immediately
       setMessages((prev) => [...prev, {
         type: 'photo',
         photo: data.photo,
         photo_id: data.photo_id,
         from: 'partner',
-        timestamp: new Date()
+        timestamp: new Date(),
+        deleted: false
       }]);
       toast.success('Partner sent a photo! Tap to view');
+    });
+    
+    // Our photo was sent successfully
+    socket.on('photo_sent', (data) => {
+      console.log('📷 Photo sent successfully');
+      setMessages((prev) => [...prev, {
+        type: 'photo',
+        photo: data.photo,
+        photo_id: data.photo_id,
+        from: 'me',
+        timestamp: new Date(),
+        deleted: false
+      }]);
+    });
+    
+    // Photo timer started (when recipient opens it)
+    socket.on('photo_timer_started', (data) => {
+      console.log('⏱️ Photo timer started:', data.photo_id);
+      // We could show a subtle indicator but timer is hidden from UI
+    });
+    
+    // Photo deleted after timer
+    socket.on('photo_deleted', (data) => {
+      console.log('🗑️ Photo deleted:', data.photo_id);
+      setMessages((prev) => prev.map(msg => 
+        msg.photo_id === data.photo_id 
+          ? { ...msg, deleted: true, photo: null }
+          : msg
+      ));
+      
+      // If currently viewing this photo, close the viewer
+      setPhotoToView((current) => {
+        if (viewingPhotoId === data.photo_id) {
+          toast.info('Photo has expired');
+          return null;
+        }
+        return current;
+      });
     });
     
     socket.on('random_topic', (data) => {
@@ -60,19 +99,29 @@ const ChatPage = ({ socket, partner, onClose, onSkip }) => {
       setPartnerDisconnected(true);
     });
     
+    socket.on('report_submitted', (data) => {
+      toast.success(data.message);
+      setShowReportModal(false);
+      setReportComment('');
+    });
+    
     return () => {
       console.log('ChatPage unmounting, removing listeners');
       socket.off('new_message');
       socket.off('new_photo');
+      socket.off('photo_sent');
+      socket.off('photo_timer_started');
+      socket.off('photo_deleted');
       socket.off('random_topic');
       socket.off('audio_signal');
       socket.off('partner_disconnected');
+      socket.off('report_submitted');
       
       if (peer) {
         peer.destroy();
       }
     };
-  }, [socket, peer]);
+  }, [socket, peer, viewingPhotoId]);
   
   useEffect(() => {
     scrollToBottom();
