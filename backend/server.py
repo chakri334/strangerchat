@@ -37,13 +37,16 @@ ip_report_count: Dict[str, int] = {}  # ip -> report_count
 # Photo tracking for disappearing photos
 photo_messages: Dict[str, dict] = {}  # photo_id -> {sender_sid, receiver_sid, opened, timer_started}
 
-# Socket.IO server with polling transport
+# Socket.IO server with polling transport + ping/pong for stability
 sio = socketio.AsyncServer(
     async_mode='asgi',
     cors_allowed_origins='*',
     logger=False,
     engineio_logger=False,
-    transports=['polling']
+    transports=['polling'],
+    ping_timeout=60,      # Wait 60s for pong
+    ping_interval=25,     # Send ping every 25s
+    max_http_buffer_size=5*1024*1024  # 5MB for photos
 )
 
 # FastAPI app
