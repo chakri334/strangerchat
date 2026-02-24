@@ -187,37 +187,6 @@ const Home = () => {
     };
   }, []);
   
-  const detectLocation = async () => {
-    if ('geolocation' in navigator) {
-      try {
-        const position = await new Promise((resolve, reject) => {
-          navigator.geolocation.getCurrentPosition(resolve, reject);
-        });
-        
-        // Reverse geocode to get city
-        const response = await fetch(
-          `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${position.coords.latitude}&longitude=${position.coords.longitude}&localityLanguage=en`
-        );
-        const data = await response.json();
-        const detectedCity = data.city || data.locality || 'Global';
-        setUserCity(detectedCity);
-        localStorage.setItem('userCity', detectedCity);
-        
-        // Update socket
-        if (socket) {
-          socket.emit('register_user', {
-            name: userName,
-            age: userAge,
-            gender: userGender,
-            city: detectedCity
-          });
-        }
-      } catch (error) {
-        console.log('Location access denied');
-      }
-    }
-  };
-  
   const handleConnect = () => {
     if (!socket || !socket.connected) {
       toast.error('Connecting to server...');
