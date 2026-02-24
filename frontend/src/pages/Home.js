@@ -20,6 +20,26 @@ const Home = () => {
   const [userAge, setUserAge] = useState('');
   const [userGender, setUserGender] = useState('');
   const [photoToView, setPhotoToView] = useState(null);
+  const [isBlocked, setIsBlocked] = useState(false);
+  const [blockMessage, setBlockMessage] = useState('');
+  const socketRef = useRef(null);
+
+  // Check if user is IP blocked on mount
+  useEffect(() => {
+    const checkBlocked = async () => {
+      try {
+        const res = await fetch(`${BACKEND_URL}/api/check-ip`);
+        const data = await res.json();
+        if (data.blocked) {
+          setIsBlocked(true);
+          setBlockMessage(data.message);
+        }
+      } catch (err) {
+        console.log('Could not check IP block status');
+      }
+    };
+    checkBlocked();
+  }, []);
 
   useEffect(() => {
     // Load user data from localStorage
@@ -41,11 +61,18 @@ const Home = () => {
     // Detect user location
     detectLocation();
     
-    // Initialize socket with polling transport
+    // Initialize socket with polling transport and reconnection options
     const newSocket = io(BACKEND_URL, {
       path: '/api/socket.io',
-      transports: ['polling']
+      transports: ['polling'],
+      reconnection: true,
+      reconnectionAttempts: 10,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      timeout: 20000
     });
+    
+    socketRef.current = newSocket;
     
     newSocket.on('connect', () => {
       console.log('✓ Connected to server');
@@ -60,8 +87,43 @@ const Home = () => {
       newSocket.emit('register_user', userData);
     });
     
+    newSocket.on('disconnect', (reason) => {
+      console.log('Disconnected:', reason);
+      if (reason === 'io server disconnect') {
+        // Server disconnected us, try to reconnect
+        newSocket.connect();
+      }
+    });
+    
+    newSocket.on('reconnect', (attemptNumber) => {
+      console.log('Reconnected after', attemptNumber, 'attempts');
+      toast.success('Reconnected to server');
+      // Re-register user
+      newSocket.emit('register_user', {
+        name: savedName,
+        age: savedAge,
+        gender: savedGender,
+        city: savedCity
+      });
+    });
+    
+    newSocket.on('reconnect_error', (error) => {
+      console.log('Reconnection error:', error);
+    });
+    
+    newSocket.on('reconnect_failed', () => {
+      console.log('Reconnection failed');
+      toast.error('Connection lost. Please refresh the page.');
+    });
+    
     newSocket.on('registered', (data) => {
       console.log('✓ User registered successfully');
+    });
+    
+    newSocket.on('blocked', (data) => {
+      setIsBlocked(true);
+      setBlockMessage(data.message);
+      toast.error(data.message);
     });
     
     newSocket.on('stats_update', (data) => {
