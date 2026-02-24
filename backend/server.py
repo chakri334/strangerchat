@@ -1,16 +1,17 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 import socketio
 import os
 import asyncio
 import random
 import base64
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Optional, Set
 from dotenv import load_dotenv
 from pathlib import Path
 import uuid
 import logging
+import time
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -26,6 +27,15 @@ city_users: Dict[str, int] = {}  # city -> count
 active_chats: Dict[str, List[str]] = {}  # room_id -> [socket_id1, socket_id2]
 user_rooms: Dict[str, str] = {}  # socket_id -> room_id
 photo_timers: Dict[str, dict] = {}  # room_id -> {photo_data, timestamp}
+
+# Report & IP blocking system
+reports: List[dict] = []  # List of report records
+ip_blocks: Dict[str, datetime] = {}  # ip -> block_expires_at
+user_ip_map: Dict[str, str] = {}  # socket_id -> ip_address
+ip_report_count: Dict[str, int] = {}  # ip -> report_count
+
+# Photo tracking for disappearing photos
+photo_messages: Dict[str, dict] = {}  # photo_id -> {sender_sid, receiver_sid, opened, timer_started}
 
 # Socket.IO server with polling transport
 sio = socketio.AsyncServer(
