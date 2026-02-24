@@ -12,34 +12,39 @@ const WaitingPage = ({ onCancel }) => {
       {/* Cancel button */}
       <button
         onClick={onCancel}
-        className="absolute top-6 right-6 p-3 rounded-full bg-white/5 hover:bg-white/10 transition-colors"
+        className="absolute top-6 right-6 p-3 rounded-full bg-white/5 hover:bg-white/10 transition-colors z-20"
         data-testid="cancel-search-button"
       >
         <X size={24} />
       </button>
       
       {/* Waiting content */}
-      <div className="relative z-10 text-center">
-        {/* Radar animation */}
-        <div className="relative inline-block mb-8">
-          <div className="absolute inset-0 animate-ping">
-            <div className="w-48 h-48 rounded-full bg-gradient-to-r from-[#7c5cfc] to-[#fc5c7d] opacity-20"></div>
+      <div className="relative z-10 text-center px-6">
+        {/* Stumble animation container */}
+        <div className="relative w-72 h-72 mx-auto mb-8">
+          {/* Pulsing background rings */}
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="absolute w-64 h-64 rounded-full bg-gradient-to-r from-[#7c5cfc]/20 to-[#fc5c7d]/20 animate-ping" style={{ animationDuration: '2s' }}></div>
+            <div className="absolute w-56 h-56 rounded-full bg-gradient-to-r from-[#7c5cfc]/30 to-[#fc5c7d]/30 animate-pulse" style={{ animationDuration: '1.5s' }}></div>
           </div>
-          <div className="absolute inset-0 animate-pulse" style={{ animationDelay: '0.5s' }}>
-            <div className="w-48 h-48 rounded-full bg-gradient-to-r from-[#7c5cfc] to-[#fc5c7d] opacity-30"></div>
-          </div>
-          <div className="relative w-48 h-48 rounded-full bg-gradient-to-br from-[#7c5cfc] to-[#fc5c7d] flex items-center justify-center">
-            <svg className="w-24 h-24 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
+          
+          {/* Stumble image with gentle animation */}
+          <div className="relative w-full h-full flex items-center justify-center">
+            <img 
+              src="https://static.prod-images.emergentagent.com/jobs/e48528ee-14fe-403e-b7d4-a45cb9cb19ec/images/9c2abd249ec46d85f6f7d2b8fb7a405de07899d0c21d4f9da791f8bf90fa9e2f.png"
+              alt="Finding someone"
+              className="w-56 h-56 object-contain animate-bounce"
+              style={{ animationDuration: '2s' }}
+              data-testid="stumble-animation"
+            />
           </div>
         </div>
         
         {/* Text */}
-        <h2 className="text-3xl font-bold mb-4" style={{ fontFamily: 'Syne, sans-serif' }} data-testid="searching-title">
+        <h2 className="text-2xl sm:text-3xl font-bold mb-4" style={{ fontFamily: 'Syne, sans-serif' }} data-testid="searching-title">
           Finding someone to chat with...
         </h2>
-        <p className="text-gray-400 animate-pulse">Searching for your next connection</p>
+        <p className="text-gray-400 animate-pulse text-sm sm:text-base">Searching for your next connection</p>
         
         {/* Loading dots */}
         <div className="flex justify-center gap-2 mt-6">
