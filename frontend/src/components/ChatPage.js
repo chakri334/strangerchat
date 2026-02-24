@@ -288,8 +288,27 @@ const ChatPage = ({ socket, partner, onClose, onSkip }) => {
   };
   
   const handleReport = () => {
-    toast.success('User reported. Thank you.');
-    handleDisconnect();
+    setShowReportModal(true);
+  };
+  
+  const submitReport = () => {
+    // Gather chat history for the report
+    const chatHistory = messages.map(msg => ({
+      from: msg.from,
+      type: msg.type || 'text',
+      text: msg.text || (msg.type === 'photo' ? '[Photo]' : ''),
+      timestamp: msg.timestamp?.toISOString()
+    }));
+    
+    socket.emit('report_user', {
+      comment: reportComment,
+      chat_history: chatHistory
+    });
+    
+    // Close chat after reporting
+    setTimeout(() => {
+      handleDisconnect();
+    }, 1000);
   };
   
   return (
