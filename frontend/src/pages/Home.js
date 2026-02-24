@@ -58,9 +58,6 @@ const Home = () => {
       localStorage.setItem('userName', savedName);
     }
     
-    // Detect user location
-    detectLocation();
-    
     // Initialize socket with polling transport and reconnection options
     const newSocket = io(BACKEND_URL, {
       path: '/api/socket.io',
@@ -73,6 +70,40 @@ const Home = () => {
     });
     
     socketRef.current = newSocket;
+    
+    // Detect location function
+    const detectUserLocation = async () => {
+      if ('geolocation' in navigator) {
+        try {
+          const position = await new Promise((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject);
+          });
+          
+          const response = await fetch(
+            `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${position.coords.latitude}&longitude=${position.coords.longitude}&localityLanguage=en`
+          );
+          const data = await response.json();
+          const detectedCity = data.city || data.locality || 'Global';
+          setUserCity(detectedCity);
+          localStorage.setItem('userCity', detectedCity);
+          
+          // Update socket
+          if (newSocket && newSocket.connected) {
+            newSocket.emit('register_user', {
+              name: savedName,
+              age: savedAge,
+              gender: savedGender,
+              city: detectedCity
+            });
+          }
+        } catch (error) {
+          console.log('Location access denied');
+        }
+      }
+    };
+    
+    // Detect location
+    detectUserLocation();
     
     newSocket.on('connect', () => {
       console.log('✓ Connected to server');
