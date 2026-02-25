@@ -24,6 +24,7 @@ const ChatPage = ({ socket, partner, onClose, onSkip }) => {
     // Socket listeners
     socket.on('new_message', (data) => {
       console.log('📨 Received message from partner:', data);
+      Analytics.messageReceived();
       setMessages((prev) => [...prev, {
         text: data.message,
         from: 'partner',
@@ -34,6 +35,7 @@ const ChatPage = ({ socket, partner, onClose, onSkip }) => {
     // Received photo from partner
     socket.on('new_photo', (data) => {
       console.log('📷 Received photo from partner');
+      Analytics.photoReceived();
       setMessages((prev) => [...prev, {
         type: 'photo',
         photo: data.photo,
@@ -48,6 +50,7 @@ const ChatPage = ({ socket, partner, onClose, onSkip }) => {
     // Our photo was sent successfully
     socket.on('photo_sent', (data) => {
       console.log('📷 Photo sent successfully, photo_id:', data.photo_id);
+      Analytics.photoSent();
       toast.success('Photo sent!');
       setMessages((prev) => [...prev, {
         type: 'photo',
