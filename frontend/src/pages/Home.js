@@ -230,6 +230,7 @@ const Home = () => {
     
     setIsSearching(true);
     socket.emit('join_queue', { city: userCity });
+    Analytics.joinQueue();
     console.log('✓ Emitted join_queue event');
     
     // Timeout after 60 seconds (increased from 30)
