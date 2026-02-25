@@ -188,8 +188,25 @@ const Home = () => {
   }, []);
   
   const handleConnect = () => {
-    if (!socket || !socket.connected) {
-      toast.error('Connecting to server...');
+    // Socket should already be connected on page load
+    // If not connected, try to reconnect automatically
+    if (!socket) {
+      toast.error('Please wait, initializing...');
+      return;
+    }
+    
+    if (!socket.connected) {
+      // Try to reconnect
+      socket.connect();
+      toast.info('Reconnecting...');
+      // Wait a bit and retry
+      setTimeout(() => {
+        if (socket.connected) {
+          handleConnect();
+        } else {
+          toast.error('Connection failed. Please refresh the page.');
+        }
+      }, 2000);
       return;
     }
     
@@ -201,13 +218,13 @@ const Home = () => {
     socket.emit('join_queue', { city: userCity });
     console.log('✓ Emitted join_queue event');
     
-    // Timeout after 30 seconds
+    // Timeout after 60 seconds (increased from 30)
     setTimeout(() => {
       if (isSearching && !chatActive) {
         setIsSearching(false);
         toast.error('No users available right now. Keep trying!');
       }
-    }, 30000);
+    }, 60000);
   };
   
   const handleCloseChat = () => {
