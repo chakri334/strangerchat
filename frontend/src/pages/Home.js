@@ -112,6 +112,7 @@ const Home = () => {
     newSocket.on('connect', () => {
       console.log('✓ Connected to server');
       setIsConnected(true);
+      Analytics.userConnected();
       // Register user immediately
       const userData = {
         name: savedName,
@@ -126,6 +127,7 @@ const Home = () => {
     newSocket.on('disconnect', (reason) => {
       console.log('Disconnected:', reason);
       setIsConnected(false);
+      Analytics.userDisconnected();
       if (reason === 'io server disconnect') {
         // Server disconnected us, try to reconnect
         newSocket.connect();
