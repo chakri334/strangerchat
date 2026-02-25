@@ -273,6 +273,7 @@ const ChatPage = ({ socket, partner, onClose, onSkip }) => {
   const handleOpenPhoto = (photo, photoId) => {
     setPhotoToView(photo);
     setViewingPhotoId(photoId);
+    Analytics.photoViewed();
     // Notify server that photo was opened (starts the 15s timer)
     socket.emit('photo_opened', { photo_id: photoId });
   };
