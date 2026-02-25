@@ -106,6 +106,8 @@ Stumble Chat is an anonymous, real-time chat application that connects random us
 - Added async_handlers and always_connect options
 - Frontend: Reduced reconnection attempts, increased delays
 - Added better error handling and logging for photos/messages
+- Report button now visible after partner disconnects
+- New animated waiting page with walking male/female silhouettes
 
 ## File Structure
 ```
