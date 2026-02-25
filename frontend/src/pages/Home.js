@@ -59,15 +59,17 @@ const Home = () => {
       localStorage.setItem('userName', savedName);
     }
     
-    // Initialize socket with polling transport and reconnection options
+    // Initialize socket with polling transport and improved stability
     const newSocket = io(BACKEND_URL, {
       path: '/api/socket.io',
       transports: ['polling'],
       reconnection: true,
-      reconnectionAttempts: 10,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-      timeout: 20000
+      reconnectionAttempts: 5,      // Reduced from 10
+      reconnectionDelay: 2000,      // Increased from 1000
+      reconnectionDelayMax: 10000,  // Increased from 5000
+      timeout: 30000,               // Increased from 20000
+      forceNew: false,              // Reuse existing connection
+      multiplex: true               // Allow multiplexing
     });
     
     socketRef.current = newSocket;
