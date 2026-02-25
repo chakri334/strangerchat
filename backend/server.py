@@ -259,13 +259,14 @@ async def handle_send_message(sid, data):
     
     if sid not in user_rooms:
         print(f'[MESSAGE] User {sid} not in any room!', flush=True)
+        await sio.emit('error', {'message': 'Not in a chat room'}, room=sid)
         return
     
     room_id = user_rooms[sid]
     message = data.get('message', '')
     timestamp = datetime.now(timezone.utc).isoformat()
     
-    print(f'[MESSAGE] User {sid} in room {room_id} sending: "{message}"', flush=True)
+    print(f'[MESSAGE] User {sid} in room {room_id} sending: "{message[:50]}..."' if len(message) > 50 else f'[MESSAGE] User {sid} in room {room_id} sending: "{message}"', flush=True)
     
     # Send to partner only
     if room_id in active_chats:
@@ -280,8 +281,10 @@ async def handle_send_message(sid, data):
             print(f'[MESSAGE] Message sent successfully to {partner_sid[0]}', flush=True)
         else:
             print(f'[MESSAGE] No partner found in room {room_id}', flush=True)
+            await sio.emit('error', {'message': 'Partner not found'}, room=sid)
     else:
         print(f'[MESSAGE] Room {room_id} not in active_chats', flush=True)
+        await sio.emit('error', {'message': 'Chat room expired'}, room=sid)
 
 @sio.on('send_photo')
 async def handle_send_photo(sid, data):
