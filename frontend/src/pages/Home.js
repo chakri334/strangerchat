@@ -333,15 +333,19 @@ const Home = () => {
               )}
               <button
                 onClick={handleConnect}
-                disabled={isSearching}
-                className="relative w-64 h-64 rounded-full bg-gradient-to-br from-[#7c5cfc] to-[#fc5c7d] shadow-2xl shadow-purple-500/20 hover:shadow-purple-500/40 transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={isSearching || !isConnected}
+                className={`relative w-64 h-64 rounded-full bg-gradient-to-br from-[#7c5cfc] to-[#fc5c7d] shadow-2xl shadow-purple-500/20 hover:shadow-purple-500/40 transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed ${!isConnected ? 'opacity-50' : ''}`}
                 data-testid="connect-button"
               >
                 <span className="text-3xl font-bold" style={{ fontFamily: 'Syne, sans-serif' }}>
-                  {isSearching ? 'Searching...' : 'Connect'}
+                  {!isConnected ? 'Loading...' : isSearching ? 'Searching...' : 'Connect'}
                 </span>
               </button>
             </div>
+            
+            {!isConnected && !isSearching && (
+              <p className="mt-6 text-yellow-400 animate-pulse">Connecting to server...</p>
+            )}
             
             {isSearching && (
               <p className="mt-6 text-gray-400 animate-pulse" data-testid="searching-text">Finding a stranger for you...</p>
