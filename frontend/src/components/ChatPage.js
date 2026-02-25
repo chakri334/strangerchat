@@ -46,7 +46,8 @@ const ChatPage = ({ socket, partner, onClose, onSkip }) => {
     
     // Our photo was sent successfully
     socket.on('photo_sent', (data) => {
-      console.log('📷 Photo sent successfully');
+      console.log('📷 Photo sent successfully, photo_id:', data.photo_id);
+      toast.success('Photo sent!');
       setMessages((prev) => [...prev, {
         type: 'photo',
         photo: data.photo,
