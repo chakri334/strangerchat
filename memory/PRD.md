@@ -100,6 +100,13 @@ Stumble Chat is an anonymous, real-time chat application that connects random us
 - **Photo Test**: 5 photos each direction - 100% delivery rate
 - **Connection Stability**: All users remained connected throughout testing
 
+### Stability Fixes Applied (December 2025)
+- Increased Socket.IO ping_timeout to 120s (from 60s)
+- Increased max_http_buffer_size to 10MB (from 5MB)
+- Added async_handlers and always_connect options
+- Frontend: Reduced reconnection attempts, increased delays
+- Added better error handling and logging for photos/messages
+
 ## File Structure
 ```
 /app/
