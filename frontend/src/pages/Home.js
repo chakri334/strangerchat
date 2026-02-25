@@ -179,6 +179,7 @@ const Home = () => {
       setIsSearching(false);
       setPartner(data.partner);
       setChatActive(true);
+      Analytics.matchFound(data.partner?.name);
       toast.success('Connected to someone!');
     });
     
