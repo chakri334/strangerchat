@@ -22,6 +22,7 @@ const Home = () => {
   const [photoToView, setPhotoToView] = useState(null);
   const [isBlocked, setIsBlocked] = useState(false);
   const [blockMessage, setBlockMessage] = useState('');
+  const [isConnected, setIsConnected] = useState(false);
   const socketRef = useRef(null);
 
   // Check if user is IP blocked on mount
