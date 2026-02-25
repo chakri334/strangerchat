@@ -304,7 +304,12 @@ const Home = () => {
         <header className="p-6 flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold" style={{ fontFamily: 'Syne, sans-serif' }} data-testid="app-logo">stumble chat</h1>
-            <p className="text-sm text-gray-400 mt-1" data-testid="online-count">{stats.online} online</p>
+            <div className="flex items-center gap-2 mt-1">
+              <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-400' : 'bg-yellow-400 animate-pulse'}`}></span>
+              <p className="text-sm text-gray-400" data-testid="online-count">
+                {isConnected ? `${stats.online} online` : 'Connecting...'}
+              </p>
+            </div>
           </div>
           <button
             onClick={() => navigate('/settings')}
