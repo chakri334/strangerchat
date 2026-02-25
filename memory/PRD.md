@@ -125,12 +125,8 @@ Stumble Chat is an anonymous, real-time chat application that connects random us
 
 ## Backlog
 
-### P0 (Critical)
-- None currently
-
 ### P1 (High Priority)
-- Screenshot prevention for photo sharing
-- Audio chat improvements (WebRTC stability)
+- None currently - core features complete
 
 ### P2 (Medium Priority)
 - Consider Redis for persistence
