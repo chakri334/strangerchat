@@ -458,23 +458,33 @@ const ChatPage = ({ socket, partner, onClose, onSkip }) => {
       {/* Input Area */}
       <div className="p-4 border-t border-white/10">
         {partnerDisconnected ? (
-          /* Partner Disconnected - Show message and reconnect option */
-          <div className="text-center py-6">
+          /* Partner Disconnected - Show message, report option, and reconnect option */
+          <div className="text-center py-4">
             <p className="text-gray-400 mb-4">Chat ended. Messages are view-only.</p>
-            <button
-              onClick={() => {
-                console.log('Find New Chat clicked');
-                if (onSkip && typeof onSkip === 'function') {
-                  onSkip();
-                } else if (onClose) {
-                  onClose();
-                }
-              }}
-              className="px-6 py-3 bg-gradient-to-r from-[#7c5cfc] to-[#fc5c7d] rounded-xl font-medium hover:shadow-lg hover:shadow-purple-500/20 transition-all"
-              data-testid="find-new-button"
-            >
-              Find New Chat
-            </button>
+            <div className="flex gap-3 justify-center">
+              <button
+                onClick={handleReport}
+                className="px-6 py-3 bg-red-500/20 hover:bg-red-500/30 rounded-xl font-medium transition-all text-red-400 flex items-center gap-2"
+                data-testid="report-after-disconnect-button"
+              >
+                <AlertCircle size={16} />
+                Report User
+              </button>
+              <button
+                onClick={() => {
+                  console.log('Find New Chat clicked');
+                  if (onSkip && typeof onSkip === 'function') {
+                    onSkip();
+                  } else if (onClose) {
+                    onClose();
+                  }
+                }}
+                className="px-6 py-3 bg-gradient-to-r from-[#7c5cfc] to-[#fc5c7d] rounded-xl font-medium hover:shadow-lg hover:shadow-purple-500/20 transition-all"
+                data-testid="find-new-button"
+              >
+                Find New Chat
+              </button>
+            </div>
           </div>
         ) : (
           <>
