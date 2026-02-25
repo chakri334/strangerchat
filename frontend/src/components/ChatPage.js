@@ -3,6 +3,7 @@ import { X, SkipForward, Image as ImageIcon, MessageCircle, AlertCircle, Send } 
 import { toast } from 'sonner';
 import SimplePeer from 'simple-peer';
 import PhotoViewer from './PhotoViewer';
+import { Analytics } from '../utils/analytics';
 
 const ChatPage = ({ socket, partner, onClose, onSkip }) => {
   const [messages, setMessages] = useState([]);
