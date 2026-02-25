@@ -108,6 +108,12 @@ Stumble Chat is an anonymous, real-time chat application that connects random us
 - Added better error handling and logging for photos/messages
 - Report button now visible after partner disconnects
 - New animated waiting page with walking male/female silhouettes
+- **Google Analytics 4 Integration** (G-9EKX5QRE9S) tracking:
+  - User connections/disconnections
+  - Queue joins and matches
+  - Messages sent/received
+  - Photos sent/received/viewed
+  - Skip, disconnect, and report actions
 
 ## File Structure
 ```
