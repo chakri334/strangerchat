@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import ChatPage from '../components/ChatPage';
 import WaitingPage from '../components/WaitingPage';
 import { Settings as SettingsIcon } from 'lucide-react';
+import { Analytics } from '../utils/analytics';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
