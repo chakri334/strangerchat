@@ -236,16 +236,30 @@ const ChatPage = ({ socket, partner, onClose, onSkip }) => {
     const file = e.target.files[0];
     if (!file) return;
     
+    // Reset input so same file can be selected again
+    e.target.value = '';
+    
     if (file.size > 5 * 1024 * 1024) {
       toast.error('Image too large. Max 5MB.');
       return;
     }
     
+    // Check if socket is connected
+    if (!socket || !socket.connected) {
+      toast.error('Not connected. Please wait...');
+      return;
+    }
+    
+    toast.info('Sending photo...');
+    
     const reader = new FileReader();
     reader.onload = (event) => {
       const base64 = event.target.result;
+      console.log('📷 Sending photo, size:', Math.round(base64.length / 1024), 'KB');
       socket.emit('send_photo', { photo: base64 });
-      // Don't add to local messages - server will send photo_sent event
+    };
+    reader.onerror = () => {
+      toast.error('Failed to read image file');
     };
     reader.readAsDataURL(file);
   };
