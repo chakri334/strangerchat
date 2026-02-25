@@ -108,6 +108,7 @@ const Home = () => {
     
     newSocket.on('connect', () => {
       console.log('✓ Connected to server');
+      setIsConnected(true);
       // Register user immediately
       const userData = {
         name: savedName,
@@ -121,10 +122,16 @@ const Home = () => {
     
     newSocket.on('disconnect', (reason) => {
       console.log('Disconnected:', reason);
+      setIsConnected(false);
       if (reason === 'io server disconnect') {
         // Server disconnected us, try to reconnect
         newSocket.connect();
       }
+    });
+    
+    newSocket.on('connect_error', (error) => {
+      console.log('Connection error:', error);
+      setIsConnected(false);
     });
     
     newSocket.on('reconnect', (attemptNumber) => {
