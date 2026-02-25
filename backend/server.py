@@ -285,11 +285,21 @@ async def handle_send_message(sid, data):
 
 @sio.on('send_photo')
 async def handle_send_photo(sid, data):
+    print(f'[PHOTO] Received photo from {sid}', flush=True)
+    
     if sid not in user_rooms:
+        print(f'[PHOTO] User {sid} not in any room!', flush=True)
         return
     
     room_id = user_rooms[sid]
     photo_data = data.get('photo', '')
+    
+    if not photo_data:
+        print(f'[PHOTO] No photo data received from {sid}', flush=True)
+        return
+    
+    photo_size_kb = len(photo_data) / 1024
+    print(f'[PHOTO] Photo size: {photo_size_kb:.1f} KB', flush=True)
     
     # Send to partner
     if room_id in active_chats:
@@ -313,12 +323,18 @@ async def handle_send_photo(sid, data):
                 'photo': photo_data,
                 'photo_id': photo_id
             }, room=sid)
+            print(f'[PHOTO] Sent photo_sent event to sender {sid}', flush=True)
             
             # Notify receiver
             await sio.emit('new_photo', {
                 'photo': photo_data,
                 'photo_id': photo_id
             }, room=partner_sid[0])
+            print(f'[PHOTO] Sent new_photo event to receiver {partner_sid[0]}', flush=True)
+        else:
+            print(f'[PHOTO] No partner found in room {room_id}', flush=True)
+    else:
+        print(f'[PHOTO] Room {room_id} not in active_chats', flush=True)
 
 @sio.on('photo_opened')
 async def handle_photo_opened(sid, data):
