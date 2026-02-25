@@ -286,6 +286,7 @@ const ChatPage = ({ socket, partner, onClose, onSkip }) => {
   const handleSkip = () => {
     console.log('Skip clicked, onSkip:', onSkip);
     socket.emit('skip_chat', {});
+    Analytics.skipChat();
     
     // Use onSkip if available, otherwise use onClose
     if (onSkip && typeof onSkip === 'function') {
@@ -301,6 +302,7 @@ const ChatPage = ({ socket, partner, onClose, onSkip }) => {
   const handleDisconnect = () => {
     console.log('Disconnect clicked');
     socket.emit('disconnect_chat', { notify: true });
+    Analytics.disconnectChat();
     onClose();
   };
   
