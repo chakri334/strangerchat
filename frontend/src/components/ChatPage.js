@@ -232,6 +232,7 @@ const ChatPage = ({ socket, partner, onClose, onSkip }) => {
     
     // Send via socket
     socket.emit('send_message', { message: inputMessage });
+    Analytics.messageSent();
     console.log('✓ Message emitted to server');
     
     setInputMessage('');
