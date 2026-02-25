@@ -327,6 +327,7 @@ const ChatPage = ({ socket, partner, onClose, onSkip }) => {
       comment: reportComment,
       chat_history: chatHistory
     });
+    Analytics.reportUser();
     
     // Close chat after reporting
     setTimeout(() => {
