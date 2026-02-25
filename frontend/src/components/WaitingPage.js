@@ -31,7 +31,7 @@ const WaitingPage = ({ onCancel }) => {
           {/* Stumble image with gentle animation */}
           <div className="relative w-full h-full flex items-center justify-center">
             <img 
-              src="https://static.prod-images.emergentagent.com/jobs/e48528ee-14fe-403e-b7d4-a45cb9cb19ec/images/9c2abd249ec46d85f6f7d2b8fb7a405de07899d0c21d4f9da791f8bf90fa9e2f.png"
+              src="https://static.prod-images.emergentagent.com/jobs/e48528ee-14fe-403e-b7d4-a45cb9cb19ec/images/516e06a21fdd3acd7c2b7701db311fd23bf5432eaeccebb55a785c1df48b754a.png"
               alt="Finding someone"
               className="w-56 h-56 object-contain animate-bounce"
               style={{ animationDuration: '2s' }}
