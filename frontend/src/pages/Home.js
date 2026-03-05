@@ -16,6 +16,11 @@ const Home = () => {
   const [userCity, setUserCity] = useState('Global');
   const [stats, setStats] = useState({ online: 0, chats_today: 0, cities: 0 });
   const [isSearching, setIsSearching] = useState(false);
+  // Wrapper that keeps isSearchingRef in sync so reconnect handler reads live value
+  const setIsSearchingSync = (val) => {
+    isSearchingRef.current = typeof val === 'function' ? val(isSearchingRef.current) : val;
+    setIsSearching(val);
+  };
   const [chatActive, setChatActive] = useState(false);
   const [partner, setPartner] = useState(null);
   const [userName, setUserName] = useState('');
@@ -26,6 +31,9 @@ const Home = () => {
   const [blockMessage, setBlockMessage] = useState('');
   const [isConnected, setIsConnected] = useState(false);
   const socketRef = useRef(null);
+  const searchTimerRef = useRef(null);   // tracks the active search timeout
+  const searchCountRef = useRef(0);      // prevents stale closure bug on isSearching
+  const isSearchingRef = useRef(false);  // live isSearching value for reconnect handler
 
   // Check if user is IP blocked on mount
   useEffect(() => {
@@ -150,17 +158,26 @@ const Home = () => {
     
     newSocket.on('reconnect', (attemptNumber) => {
       console.log('Reconnected after', attemptNumber, 'attempts');
-      // Re-register user after reconnect — server may have cleaned up state
-      // during a long disconnect (e.g. phone backgrounded for several minutes).
-      // The backend register_user handler now safely handles re-registration
-      // without inflating the count (deduplication fix applied).
+
+      // Step 1: Re-register — server removes user from active_connections on disconnect
       newSocket.emit('register_user', {
         name: savedName,
         age: savedAge,
         gender: savedGender,
         city: savedCity
       });
-      // Only show toast after multiple attempts — single blip reconnects are silent
+
+      // Step 2: THE KEY FIX
+      // If user was on WaitingPage when the connection dropped, the server
+      // removed them from waiting_queue on disconnect. The WaitingPage still
+      // shows but the user is invisible to anyone joining the queue.
+      // Fix: re-emit join_queue after reconnect if still searching.
+      // isSearchingRef holds the live value (avoids stale closure bug).
+      if (isSearchingRef.current) {
+        console.log('Reconnected while on WaitingPage — rejoining queue...');
+        newSocket.emit('join_queue', { city: savedCity });
+      }
+
       if (attemptNumber > 1) {
         toast.success('Reconnected!');
       }
@@ -191,7 +208,13 @@ const Home = () => {
     });
     
     newSocket.on('match_found', (data) => {
-      setIsSearching(false);
+      setIsSearchingSync(false);
+      // Clear retry timer — we found a match, no more retries needed
+      if (searchTimerRef.current) {
+        clearTimeout(searchTimerRef.current);
+        searchTimerRef.current = null;
+      }
+      searchCountRef.current++; // invalidate any pending timers
       setPartner(data.partner);
       setChatActive(true);
       Analytics.matchFound(data.partner?.name);
@@ -245,68 +268,117 @@ const Home = () => {
   }, []);
   
   const handleConnect = () => {
-    // Socket should already be connected on page load
-    // If not connected, try to reconnect automatically
     if (!socket) {
       toast.error('Please wait, initializing...');
       return;
     }
     
     if (!socket.connected) {
-      // Try to reconnect
       socket.connect();
       toast.info('Reconnecting...');
-      // Wait a bit and retry
       setTimeout(() => {
-        if (socket.connected) {
-          handleConnect();
-        } else {
-          toast.error('Connection failed. Please refresh the page.');
-        }
+        if (socket.connected) handleConnect();
+        else toast.error('Connection failed. Please refresh the page.');
       }, 2000);
+      return;
+    }
+
+    // FIX: Block duplicate Connect clicks while already searching.
+    // Without this, each extra click adds another timeout timer
+    // that later fires leave_queue and removes the user from the queue.
+    if (isSearching) {
+      console.log('Already searching — ignoring duplicate Connect click');
       return;
     }
     
     console.log('🔍 Joining queue for city:', userCity);
-    console.log('Socket connected:', socket.connected);
-    console.log('Socket ID:', socket.id);
     
-    setIsSearching(true);
+    setIsSearchingSync(true);
     socket.emit('join_queue', { city: userCity });
     Analytics.joinQueue();
-    console.log('✓ Emitted join_queue event');
-    
-    // Timeout after 60 seconds
-    setTimeout(() => {
-      if (isSearching && !chatActive) {
-        setIsSearching(false);
-        // Tell server to remove us from queue — without this the server
-        // keeps us in the queue and may match us after we've given up
-        socket.emit('leave_queue');
-        toast.error('No users available right now. Keep trying!');
-      }
-    }, 60000);
+
+    // FIX: Cancel any previous search timer before starting a new one.
+    // Prevents ghost timers from old clicks firing leave_queue unexpectedly.
+    if (searchTimerRef.current) {
+      clearTimeout(searchTimerRef.current);
+    }
+
+    // FIX: Increment search count — used to detect stale timers.
+    // If user cancels and restarts, the old timer's count won't match
+    // and it won't fire leave_queue on the new search.
+    const thisSearch = ++searchCountRef.current;
+
+    // Auto-retry every 60s instead of giving up.
+    // User1 waiting 3+ minutes now keeps retrying silently.
+    const scheduleRetry = () => {
+      searchTimerRef.current = setTimeout(() => {
+        // Stale closure fix: check ref count matches this search session
+        if (searchCountRef.current !== thisSearch) return;
+
+        // If still searching and no match, re-emit join_queue silently
+        // This re-registers in the backend queue and reschedules
+        // Read live value from ref — avoids stale closure on isSearching
+        if (isSearchingRef.current && !chatActive) {
+          console.log('Still searching — re-joining queue...');
+          socket.emit('join_queue', { city: userCity });
+          scheduleRetry();
+        }
+      }, 60000);
+    };
+    scheduleRetry();
   };
   
   const handleCloseChat = () => {
     setChatActive(false);
     setPartner(null);
-    setIsSearching(false);
+    setIsSearchingSync(false);
   };
   
   const handleSkipToNew = () => {
-    // Close current chat
     setChatActive(false);
     setPartner(null);
-    // Start searching immediately
-    setIsSearching(true);
+
+    // FIX 1: Use setIsSearchingSync so isSearchingRef.current = true.
+    // Without this, if connection drops during the new search after skip,
+    // the reconnect handler sees isSearchingRef.current = false and
+    // never re-joins the queue — User1 is invisible to everyone.
+    setIsSearchingSync(true);
     socket.emit('join_queue', { city: userCity });
+
+    // FIX 2: Start the retry timer — without this, if nobody is found
+    // within the first attempt, join_queue is never re-emitted.
+    // handleConnect() normally does this but skip bypasses handleConnect.
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    const thisSearch = ++searchCountRef.current;
+    const scheduleRetry = () => {
+      searchTimerRef.current = setTimeout(() => {
+        if (searchCountRef.current !== thisSearch) return;
+        setIsSearching(prev => {
+          if (prev) {
+            socket.emit('join_queue', { city: userCity });
+            scheduleRetry();
+          }
+          return prev;
+        });
+      }, 60000);
+    };
+    scheduleRetry();
+
     toast.info('Finding new chat...');
   };
   
   const handleCancelSearch = () => {
     setIsSearching(false);
-    // Could emit a leave_queue event if needed
+    // Clear the retry timer so it doesn't fire after cancel
+    if (searchTimerRef.current) {
+      clearTimeout(searchTimerRef.current);
+      searchTimerRef.current = null;
+    }
+    searchCountRef.current++; // invalidate any pending timers
+    // Tell server to remove from queue
+    if (socket && socket.connected) {
+      socket.emit('leave_queue');
+    }
   };
 
   // Show waiting page when searching
