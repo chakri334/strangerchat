@@ -3,4 +3,4 @@ Allow: /
 Disallow: /api/
 
 # Point crawlers to the sitemap
-Sitemap: https://stumblechat.app/sitemap.xml
+Sitemap: https://stumblechat.online/sitemap.xml

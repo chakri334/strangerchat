@@ -2,21 +2,21 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
         xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
-    <loc>https://stumblechat.app/</loc>
+    <loc>https://stumblechat.online/</loc>
     <lastmod>2026-03-05</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
     <!-- Hreflang annotations for international SEO -->
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://stumblechat.app/"/>
-    <xhtml:link rel="alternate" hreflang="en"    href="https://stumblechat.app/"/>
-    <xhtml:link rel="alternate" hreflang="en-US" href="https://stumblechat.app/"/>
-    <xhtml:link rel="alternate" hreflang="en-IN" href="https://stumblechat.app/"/>
-    <xhtml:link rel="alternate" hreflang="en-GB" href="https://stumblechat.app/"/>
-    <xhtml:link rel="alternate" hreflang="en-AU" href="https://stumblechat.app/"/>
-    <xhtml:link rel="alternate" hreflang="en-CA" href="https://stumblechat.app/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://stumblechat.online/"/>
+    <xhtml:link rel="alternate" hreflang="en"    href="https://stumblechat.online/"/>
+    <xhtml:link rel="alternate" hreflang="en-US" href="https://stumblechat.online/"/>
+    <xhtml:link rel="alternate" hreflang="en-IN" href="https://stumblechat.online/"/>
+    <xhtml:link rel="alternate" hreflang="en-GB" href="https://stumblechat.online/"/>
+    <xhtml:link rel="alternate" hreflang="en-AU" href="https://stumblechat.online/"/>
+    <xhtml:link rel="alternate" hreflang="en-CA" href="https://stumblechat.online/"/>
   </url>
   <url>
-    <loc>https://stumblechat.app/settings</loc>
+    <loc>https://stumblechat.online/settings</loc>
     <lastmod>2026-03-05</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
