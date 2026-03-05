@@ -37,18 +37,18 @@ ip_report_count: Dict[str, int] = {}  # ip -> report_count
 # Photo tracking for disappearing photos
 photo_messages: Dict[str, dict] = {}  # photo_id -> {sender_sid, receiver_sid, opened, timer_started}
 
-# Socket.IO server with polling transport + improved stability
+# Socket.IO server — strong connection config for mobile users
 sio = socketio.AsyncServer(
     async_mode='asgi',
     cors_allowed_origins='*',
     logger=False,
     engineio_logger=False,
-    transports=['polling'],
-    ping_timeout=120,       # Increased from 60 - wait 120s for pong
-    ping_interval=25,       # Send ping every 25s
+    transports=['websocket', 'polling'],  # WebSocket first, polling fallback
+    ping_timeout=60,        # Declare dead after 60s of no pong (was 120s — too slow to detect drops)
+    ping_interval=20,       # Ping every 20s — catches mobile background drops faster
     max_http_buffer_size=10*1024*1024,  # 10MB for photos
-    async_handlers=True,    # Enable async handlers
-    always_connect=True     # Always accept connections
+    async_handlers=True,
+    always_connect=True
 )
 
 # FastAPI app
@@ -191,6 +191,17 @@ async def handle_register_user(sid, data):
     
     print(f'[SOCKET] Registering user {sid}: name={name}, city={city}', flush=True)
     logger.info(f'Registering user {sid}: name={name}, city={city}')
+    
+    # BUG FIX: If this sid is already registered (reconnect scenario),
+    # decrement the old city count before re-registering.
+    # Without this, every reconnect inflates the online/city counts.
+    if sid in active_connections:
+        old_city = active_connections[sid].get('city', 'Global')
+        if old_city in city_users:
+            city_users[old_city] = max(0, city_users[old_city] - 1)
+            if city_users[old_city] == 0:
+                del city_users[old_city]
+        print(f'[SOCKET] User {sid} re-registering (reconnect). Old city: {old_city}', flush=True)
     
     active_connections[sid] = {
         'name': name,
@@ -424,6 +435,17 @@ async def handle_disconnect_chat(sid, data=None):
         del user_rooms[sid]
     
     await sio.emit('chat_ended', room=sid)
+
+@sio.on('leave_queue')
+async def handle_leave_queue(sid, data=None):
+    """Remove user from waiting queue — called when frontend search times out."""
+    for city, users in list(waiting_queue.items()):
+        if sid in users:
+            users.remove(sid)
+            print(f'[QUEUE] User {sid} removed from {city} queue (leave_queue)', flush=True)
+            if not users:
+                del waiting_queue[city]
+    await sio.emit('queue_left', {}, room=sid)
 
 @sio.on('audio_signal')
 async def handle_audio_signal(sid, data):
