@@ -61,17 +61,18 @@ const Home = () => {
       localStorage.setItem('userName', savedName);
     }
     
-    // Initialize socket with polling transport and improved stability
+    // Strong connection config — optimised for mobile users in India
     const newSocket = io(BACKEND_URL, {
       path: '/api/socket.io',
-      transports: ['polling'],
+      transports: ['websocket', 'polling'], // WebSocket first, polling as fallback
       reconnection: true,
-      reconnectionAttempts: 5,      // Reduced from 10
-      reconnectionDelay: 2000,      // Increased from 1000
-      reconnectionDelayMax: 10000,  // Increased from 5000
-      timeout: 30000,               // Increased from 20000
-      forceNew: false,              // Reuse existing connection
-      multiplex: true               // Allow multiplexing
+      reconnectionAttempts: Infinity,  // Keep trying forever — don't give up
+      reconnectionDelay: 1000,         // Start retrying after 1s
+      reconnectionDelayMax: 10000,     // Cap at 10s between retries
+      randomizationFactor: 0.5,        // Spread out reconnect storms
+      timeout: 20000,
+      forceNew: false,
+      multiplex: true
     });
     
     socketRef.current = newSocket;
@@ -131,9 +132,14 @@ const Home = () => {
       console.log('Disconnected:', reason);
       setIsConnected(false);
       Analytics.userDisconnected();
-      if (reason === 'io server disconnect') {
-        // Server disconnected us, try to reconnect
-        newSocket.connect();
+      // Reconnect for ALL disconnect reasons except deliberate client-side close
+      // 'io server disconnect' = server kicked us (blocked, etc) — still reconnect
+      // 'transport close' = network dropped (mobile background, lost signal)
+      // 'transport error' = connection error
+      // 'ping timeout' = server didn't hear from us (phone was backgrounded)
+      if (reason !== 'io client disconnect') {
+        console.log('Auto-reconnecting due to:', reason);
+        setTimeout(() => newSocket.connect(), 1000);
       }
     });
     
@@ -144,14 +150,20 @@ const Home = () => {
     
     newSocket.on('reconnect', (attemptNumber) => {
       console.log('Reconnected after', attemptNumber, 'attempts');
-      toast.success('Reconnected to server');
-      // Re-register user
+      // Re-register user after reconnect — server may have cleaned up state
+      // during a long disconnect (e.g. phone backgrounded for several minutes).
+      // The backend register_user handler now safely handles re-registration
+      // without inflating the count (deduplication fix applied).
       newSocket.emit('register_user', {
         name: savedName,
         age: savedAge,
         gender: savedGender,
         city: savedCity
       });
+      // Only show toast after multiple attempts — single blip reconnects are silent
+      if (attemptNumber > 1) {
+        toast.success('Reconnected!');
+      }
     });
     
     newSocket.on('reconnect_error', (error) => {
@@ -199,8 +211,35 @@ const Home = () => {
     });
     
     setSocket(newSocket);
+
+    // Page Visibility API — fires when phone screen wakes up or user
+    // switches back to the browser tab after backgrounding it.
+    // Without this, mobile users return to a broken connection silently.
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        console.log('Tab became visible — checking connection...');
+        const sock = socketRef.current;
+        if (sock && !sock.connected) {
+          console.log('Socket was disconnected while hidden — reconnecting...');
+          sock.connect();
+        }
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // Online/offline events — fires when phone regains mobile data or WiFi
+    const handleOnline = () => {
+      console.log('Network came back online — reconnecting socket...');
+      const sock = socketRef.current;
+      if (sock && !sock.connected) {
+        sock.connect();
+      }
+    };
+    window.addEventListener('online', handleOnline);
     
     return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('online', handleOnline);
       newSocket.close();
     };
   }, []);
@@ -237,10 +276,13 @@ const Home = () => {
     Analytics.joinQueue();
     console.log('✓ Emitted join_queue event');
     
-    // Timeout after 60 seconds (increased from 30)
+    // Timeout after 60 seconds
     setTimeout(() => {
       if (isSearching && !chatActive) {
         setIsSearching(false);
+        // Tell server to remove us from queue — without this the server
+        // keeps us in the queue and may match us after we've given up
+        socket.emit('leave_queue');
         toast.error('No users available right now. Keep trying!');
       }
     }, 60000);
