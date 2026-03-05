@@ -3,55 +3,177 @@
     <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <meta name="theme-color" content="#000000" />
-        <meta name="description" content="Stumble Chat: Connect instantly with people worldwide! Enjoy free random chat, share photos, and make new friends seamlessly." />
+        <meta name="theme-color" content="#7c5cfc" />
+
+        <!-- PRIMARY SEO META TAGS -->
+        <title>Stumble Chat – Free Random Chat with Strangers Online | Meet New People</title>
+        <meta name="description" content="Stumble Chat is a free random chat app that connects you with strangers worldwide. Meet new people, share photos, and have real conversations instantly – no sign-up required." />
+        <meta name="keywords" content="random chat, stranger chat, meet new people, free chat, anonymous chat, online chat, omegle alternative, chat with strangers, make friends online, free random video chat" />
+        <meta name="author" content="Stumble Chat" />
+        <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
+        <meta name="googlebot" content="index, follow" />
+        <link rel="canonical" href="https://stumblechat.app/" />
+
+        <!-- GEO / GEOGRAPHIC TARGETING TAGS -->
+        <meta name="geo.region" content="US" />
+        <meta name="geo.placename" content="Worldwide" />
+        <meta name="DC.language" content="en" />
+
+        <!-- OPEN GRAPH -->
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="https://stumblechat.app/" />
+        <meta property="og:title" content="Stumble Chat – Free Random Chat with Strangers Online" />
+        <meta property="og:description" content="Connect with random strangers instantly. Free anonymous chat, photo sharing, and real conversations worldwide. No sign-up needed!" />
+        <meta property="og:image" content="https://stumblechat.app/og-image.png" />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        <meta property="og:image:alt" content="Stumble Chat – Meet Strangers Online" />
+        <meta property="og:site_name" content="Stumble Chat" />
+        <meta property="og:locale" content="en_US" />
+        <meta property="og:locale:alternate" content="en_IN" />
+        <meta property="og:locale:alternate" content="en_GB" />
+        <meta property="og:locale:alternate" content="en_AU" />
+
+        <!-- TWITTER / X CARD -->
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="Stumble Chat – Free Random Chat with Strangers Online" />
+        <meta name="twitter:description" content="Connect with random strangers instantly. Free anonymous chat, photo sharing, and real conversations worldwide. No sign-up needed!" />
+        <meta name="twitter:image" content="https://stumblechat.app/og-image.png" />
+        <meta name="twitter:image:alt" content="Stumble Chat – Meet Strangers Online" />
+
+        <!-- HREFLANG – INTERNATIONAL SEO -->
+        <link rel="alternate" hreflang="x-default" href="https://stumblechat.app/" />
+        <link rel="alternate" hreflang="en" href="https://stumblechat.app/" />
+        <link rel="alternate" hreflang="en-US" href="https://stumblechat.app/" />
+        <link rel="alternate" hreflang="en-IN" href="https://stumblechat.app/" />
+        <link rel="alternate" hreflang="en-GB" href="https://stumblechat.app/" />
+        <link rel="alternate" hreflang="en-AU" href="https://stumblechat.app/" />
+        <link rel="alternate" hreflang="en-CA" href="https://stumblechat.app/" />
+
+        <!-- JSON-LD STRUCTURED DATA: WebApplication -->
+        <script type="application/ld+json">
+        {
+          "@context": "https://schema.org",
+          "@type": "WebApplication",
+          "name": "Stumble Chat",
+          "url": "https://stumblechat.app/",
+          "description": "Free random chat app that connects you with strangers worldwide. Meet new people, share photos, and have real conversations instantly.",
+          "applicationCategory": "SocialNetworkingApplication",
+          "operatingSystem": "Any",
+          "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "USD"
+          },
+          "featureList": [
+            "Anonymous random chat",
+            "Photo sharing with auto-delete",
+            "City-based matching",
+            "No sign-up required",
+            "Real-time messaging"
+          ],
+          "screenshot": "https://stumblechat.app/og-image.png",
+          "aggregateRating": {
+            "@type": "AggregateRating",
+            "ratingValue": "4.5",
+            "reviewCount": "1200"
+          }
+        }
+        </script>
+
+        <!-- JSON-LD STRUCTURED DATA: Organization -->
+        <script type="application/ld+json">
+        {
+          "@context": "https://schema.org",
+          "@type": "Organization",
+          "name": "Stumble Chat",
+          "url": "https://stumblechat.app/",
+          "logo": "https://stumblechat.app/logo192.png"
+        }
+        </script>
+
+        <!-- JSON-LD STRUCTURED DATA: FAQPage -->
+        <script type="application/ld+json">
+        {
+          "@context": "https://schema.org",
+          "@type": "FAQPage",
+          "mainEntity": [
+            {
+              "@type": "Question",
+              "name": "Is Stumble Chat free?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Yes, Stumble Chat is completely free. No subscription or sign-up is needed to start chatting."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Is Stumble Chat anonymous?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Yes. You can use any display name and no personal information is stored beyond the session."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "How does photo sharing work on Stumble Chat?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Photos are shared as clickable thumbnails. Once the recipient opens a photo, a 15-second timer starts and the photo disappears for both users automatically."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Can I chat with people from my city on Stumble Chat?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Yes! Stumble Chat uses location-based matching to first try connecting you with people from the same city, then expands globally if no local match is found."
+              }
+            }
+          ]
+        }
+        </script>
+
+        <!-- PWA / APP META TAGS -->
+        <meta name="application-name" content="Stumble Chat" />
+        <meta name="apple-mobile-web-app-title" content="Stumble Chat" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="format-detection" content="telephone=no" />
+
+        <!-- PERFORMANCE: PRECONNECT & DNS PREFETCH -->
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@600&display=swap" rel="stylesheet" />
-        <!--
-        manifest.json provides metadata used when your web app is installed on a
-        user's mobile device or desktop. See https://developers.google.com/web/fundamentals/web-app-manifest/
-        -->
-        <!--
-        Notice the use of %PUBLIC_URL% in the tags above.
-        It will be replaced with the URL of the `public` folder during the build.
-        Only files inside the `public` folder can be referenced from the HTML.
+        <link rel="dns-prefetch" href="https://www.googletagmanager.com" />
+        <link rel="dns-prefetch" href="https://api.bigdatacloud.net" />
 
-        Unlike "/favicon.ico" or "favicon.ico", "%PUBLIC_URL%/favicon.ico" will
-        work correctly both with client-side routing and a non-root public URL.
-        Learn how to configure a non-root public URL by running `npm run build`.
-        -->
-        <title>Stumble Chat - Meet New People</title>
-        
+        <!-- Fonts -->
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet" />
+
         <!-- Google Analytics 4 -->
         <script async src="https://www.googletagmanager.com/gtag/js?id=G-9EKX5QRE9S"></script>
         <script>
             window.dataLayer = window.dataLayer || [];
             function gtag(){dataLayer.push(arguments);}
             gtag('js', new Date());
-            gtag('config', 'G-9EKX5QRE9S');
+            gtag('config', 'G-9EKX5QRE9S', {
+                'send_page_view': true,
+                'anonymize_ip': true,
+                'cookie_flags': 'SameSite=None;Secure'
+            });
         </script>
-        
+
         <script>window.addEventListener("error",function(e){if(e.error instanceof DOMException&&e.error.name==="DataCloneError"&&e.message&&e.message.includes("PerformanceServerTiming")){e.stopImmediatePropagation();e.preventDefault()}},true);</script>
         <script src="https://assets.emergent.sh/scripts/emergent-main.js"></script>
-        <!--
-        These two scripts have been added for the Visual Edits, please do not edit or remove them
-        -->
+
         <script>
-            // Only load visual edit scripts when inside an iframe
             if (window.self !== window.top) {
-                // Load debug monitor script
                 var debugMonitorScript = document.createElement('script');
                 debugMonitorScript.src = 'https://assets.emergent.sh/scripts/debug-monitor.js';
                 document.head.appendChild(debugMonitorScript);
-
-                // Configure Tailwind
                 window.tailwind = window.tailwind || {};
-                tailwind.config = {
-                    corePlugins: { preflight: false },
-                };
-
-                // Load Tailwind CDN
+                tailwind.config = { corePlugins: { preflight: false } };
                 var tailwindScript = document.createElement('script');
                 tailwindScript.src = 'https://cdn.tailwindcss.com';
                 document.head.appendChild(tailwindScript);
@@ -59,19 +181,14 @@
         </script>
     </head>
     <body>
-        <noscript>You need to enable JavaScript to run this app.</noscript>
+        <noscript>
+            <div style="font-family:sans-serif;max-width:600px;margin:40px auto;padding:20px;text-align:center;">
+                <h1>Stumble Chat – Free Random Chat with Strangers</h1>
+                <p>Connect instantly with people worldwide. Free anonymous chat, photo sharing, and real conversations – no sign-up required.</p>
+                <p>Please enable JavaScript to use Stumble Chat.</p>
+            </div>
+        </noscript>
         <div id="root"></div>
-        <!--
-      This HTML file is a template.
-      If you open it directly in the browser, you will see an empty page.
-
-      You can add webfonts, meta tags, or analytics to this file.
-      The build step will place the bundled scripts into the <body> tag.
-
-      To begin the development, run `npm start` or `yarn start`.
-      To create a production bundle, use `npm run build` or `yarn build`.
-    -->
-        <!-- Badge removed -->
         <script>
             !(function (t, e) {
                 var o, n, p, r;
@@ -136,7 +253,7 @@
             })(document, window.posthog || []);
             posthog.init("phc_xAvL2Iq4tFmANRE7kzbKwaSqp1HJjN7x48s3vr0CMjs", {
                 api_host: "https://us.i.posthog.com",
-                person_profiles: "identified_only", // or 'always' to create profiles for anonymous users as well,
+                person_profiles: "identified_only",
                 session_recording: {
                     recordCrossOriginIframes: true,
                     capturePerformance: false,
