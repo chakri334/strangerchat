@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+
+# Point crawlers to the sitemap
+Sitemap: https://stumblechat.app/sitemap.xml
