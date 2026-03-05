@@ -6,6 +6,7 @@ import ChatPage from '../components/ChatPage';
 import WaitingPage from '../components/WaitingPage';
 import { Settings as SettingsIcon } from 'lucide-react';
 import { Analytics } from '../utils/analytics';
+import { setGeoTitle, trackCitySearch, trackGeoMatch } from '../utils/seo';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -90,6 +91,8 @@ const Home = () => {
           const detectedCity = data.city || data.locality || 'Global';
           setUserCity(detectedCity);
           localStorage.setItem('userCity', detectedCity);
+          setGeoTitle(detectedCity);
+          trackCitySearch(detectedCity);
           
           // Update socket
           if (newSocket && newSocket.connected) {
@@ -180,6 +183,7 @@ const Home = () => {
       setPartner(data.partner);
       setChatActive(true);
       Analytics.matchFound(data.partner?.name);
+      trackGeoMatch(userCity, data.partner?.city);
       toast.success('Connected to someone!');
     });
     
