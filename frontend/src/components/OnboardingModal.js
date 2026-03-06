@@ -1,10 +1,12 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Shield, Users, Camera, AlertTriangle } from 'lucide-react';
 
 const OnboardingModal = ({ onAccept }) => {
-  const navigate = useNavigate();
   const [checked, setChecked] = useState(false);
+
+  // FIX: Open in new tab — navigating away loses the modal state
+  // and the user returns to an unchecked modal after pressing back
+  const openPage = (path) => window.open(path, '_blank');
 
   const handleAccept = () => {
     if (!checked) return;
@@ -14,7 +16,7 @@ const OnboardingModal = ({ onAccept }) => {
 
   return (
     <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4">
-      <div className="bg-[#111111] rounded-2xl max-w-md w-full border border-white/10 overflow-hidden">
+      <div className="bg-[#111111] rounded-2xl max-w-md w-full border border-white/10 overflow-hidden max-h-[90vh] flex flex-col">
 
         {/* Header */}
         <div className="bg-gradient-to-r from-[#7c5cfc]/20 to-[#fc5c7d]/20 p-6 text-center border-b border-white/10">
@@ -28,7 +30,7 @@ const OnboardingModal = ({ onAccept }) => {
         </div>
 
         {/* Rules */}
-        <div className="p-6 space-y-4">
+        <div className="p-6 space-y-4 overflow-y-auto flex-1">
           {[
             {
               icon: <Shield size={20} className="text-[#7c5cfc]" />,
@@ -79,21 +81,21 @@ const OnboardingModal = ({ onAccept }) => {
             <span className="text-gray-300 text-sm leading-relaxed">
               I am 18 or older and I agree to the{' '}
               <button
-                onClick={(e) => { e.stopPropagation(); navigate('/terms'); }}
+                onClick={(e) => { e.stopPropagation(); openPage('/terms'); }}
                 className="text-[#7c5cfc] hover:underline"
               >
                 Terms & Conditions
               </button>
               ,{' '}
               <button
-                onClick={(e) => { e.stopPropagation(); navigate('/privacy'); }}
+                onClick={(e) => { e.stopPropagation(); openPage('/privacy'); }}
                 className="text-[#7c5cfc] hover:underline"
               >
                 Privacy Policy
               </button>
               , and{' '}
               <button
-                onClick={(e) => { e.stopPropagation(); navigate('/guidelines'); }}
+                onClick={(e) => { e.stopPropagation(); openPage('/guidelines'); }}
                 className="text-[#7c5cfc] hover:underline"
               >
                 Community Guidelines
