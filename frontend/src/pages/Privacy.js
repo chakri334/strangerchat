@@ -1,8 +1,15 @@
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
+import useSEO from '../hooks/useSEO';
 
 const Privacy = () => {
   const navigate = useNavigate();
+
+  useSEO({
+    title: 'Privacy Policy',
+    description: 'Stumble Chat Privacy Policy. We collect minimal data – no emails, no stored chats. Learn exactly what we collect, why, and how your data is protected.',
+    canonical: '/privacy',
+  });
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white pb-20">
@@ -14,9 +21,7 @@ const Privacy = () => {
       </header>
 
       <div className="max-w-2xl mx-auto px-6 py-8 space-y-8">
-
         <p className="text-gray-400 text-sm">Last updated: March 2026</p>
-
         <p className="text-gray-300 leading-relaxed">
           This Privacy Policy explains what data Stumble Chat collects, how it is used, and your rights.
           We are committed to collecting as little data as possible.
@@ -56,35 +61,33 @@ const Privacy = () => {
           {
             title: "4. Third-Party Services",
             items: [
-              "Google Analytics 4 — anonymized usage analytics. See Google's Privacy Policy for details.",
-              "PostHog — product analytics for app improvement. Data is anonymized.",
-              "BigDataCloud API — used to detect your city from your IP address. Only the city name is retained.",
+              "Google Analytics 4 — anonymized usage analytics.",
+              "PostHog — product analytics.",
+              "BigDataCloud — used for city-level geolocation from your IP. Only the city name is returned.",
             ]
           },
           {
-            title: "5. Data Retention",
+            title: "5. Cookies & Local Storage",
             items: [
-              "Session data (connections, queues, active chats) — deleted immediately when you disconnect.",
-              "Photos — deleted automatically after 15 seconds of being viewed, or when the chat ends.",
-              "IP block records — deleted automatically after 3 days.",
-              "Report records — retained for up to 90 days for abuse review, then deleted.",
-              "Local storage (name, age, gender, city) — stored in your browser until you clear it.",
+              "We use browser local storage to remember your display name, age, gender, and city between sessions.",
+              "We use session cookies for your Socket.IO connection.",
+              "Google Analytics and PostHog set analytics cookies. See our Cookie Policy for full details.",
             ]
           },
           {
             title: "6. Your Rights",
             items: [
-              "You can clear your profile data at any time by clearing your browser's local storage.",
-              "You can use the app without providing a real name — a display name is sufficient.",
-              "To request deletion of any report data associated with your IP address, contact Stumblechat.online@gmail.com.",
+              "You can clear all locally stored data by clearing your browser's local storage or site data.",
+              "Since we don't store personal data on our servers, there is nothing to request deletion of beyond local storage.",
+              "For questions or data requests, contact us at stumblechat.online@gmail.com.",
             ]
           },
           {
             title: "7. Children's Privacy",
             items: [
-              "Stumble Chat is not intended for users under 18 years of age.",
+              "Stumble Chat is intended for users aged 18 and over.",
               "We do not knowingly collect data from minors.",
-              "If you believe a minor is using the service, please report it to Stumblechat.online@gmail.com.",
+              "If you believe a minor is using the service, please report it to stumblechat.online@gmail.com.",
             ]
           },
           {
@@ -93,7 +96,7 @@ const Privacy = () => {
               "We may update this policy from time to time. The 'Last updated' date at the top of this page will reflect any changes.",
               "Continued use of the app after changes are posted constitutes acceptance of the updated policy.",
             ]
-          }
+          },
         ].map(({ title, items }) => (
           <div key={title}>
             <h2 className="text-lg font-bold mb-3 text-white" style={{ fontFamily: 'Syne, sans-serif' }}>{title}</h2>

@@ -2,94 +2,88 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
+import useSEO from '../hooks/useSEO';
+
+const CITIES = [
+  'Global','Mumbai','Delhi','Bangalore','Hyderabad','Chennai','Kolkata','Pune','Ahmedabad',
+  'New York','Los Angeles','Chicago','Houston','Phoenix','Philadelphia','San Antonio',
+  'London','Manchester','Birmingham','Leeds','Glasgow',
+  'Toronto','Vancouver','Montreal','Calgary',
+  'Sydney','Melbourne','Brisbane','Perth',
+  'Dubai','Abu Dhabi','Riyadh','Doha',
+  'Singapore','Kuala Lumpur','Jakarta','Bangkok','Manila','Ho Chi Minh City',
+  'Tokyo','Seoul','Shanghai','Beijing','Hong Kong',
+  'Paris','Berlin','Madrid','Rome','Amsterdam','Brussels','Vienna','Stockholm',
+  'São Paulo','Mexico City','Buenos Aires','Bogotá','Lima',
+  'Lagos','Nairobi','Cairo','Johannesburg','Accra',
+];
 
 const Settings = () => {
   const navigate = useNavigate();
-  const [name, setName] = useState('');
-  const [age, setAge] = useState('');
-  const [gender, setGender] = useState('');
+  const [name, setName]               = useState('');
+  const [age, setAge]                 = useState('');
+  const [gender, setGender]           = useState('');
+  const [city, setCity]               = useState('Global');
   const [genderLocked, setGenderLocked] = useState(false);
-  const [selectedCity, setSelectedCity] = useState('Global');
-  
+
+  useSEO({
+    title: 'Settings',
+    description: 'Update your Stumble Chat display name, age, gender, and city preferences.',
+    canonical: '/settings',
+    noIndex: true,
+  });
+
   useEffect(() => {
-    // Load saved data
-    const savedName = localStorage.getItem('userName') || '';
-    const savedAge = localStorage.getItem('userAge') || '';
-    const savedGender = localStorage.getItem('userGender') || '';
-    const savedCity = localStorage.getItem('userCity') || 'Global';
-    const isGenderLocked = localStorage.getItem('genderLocked') === 'true';
-    
-    setName(savedName);
-    setAge(savedAge);
-    setGender(savedGender);
-    setSelectedCity(savedCity);
-    setGenderLocked(isGenderLocked);
+    setName(localStorage.getItem('userName') || '');
+    setAge(localStorage.getItem('userAge') || '');
+    setGender(localStorage.getItem('userGender') || '');
+    setCity(localStorage.getItem('userCity') || 'Global');
+    setGenderLocked(!!localStorage.getItem('userGender'));
   }, []);
-  
+
   const handleSave = () => {
-    if (!name.trim()) {
-      toast.error('Please enter a display name');
-      return;
-    }
-    
-    localStorage.setItem('userName', name);
+    if (!name.trim()) { toast.error('Please enter a display name'); return; }
+    localStorage.setItem('userName', name.trim());
     localStorage.setItem('userAge', age);
-    localStorage.setItem('userCity', selectedCity);
-    
-    // Lock gender after first save if set
-    if (gender && !genderLocked) {
+    localStorage.setItem('userCity', city);
+    if (!genderLocked && gender) {
       localStorage.setItem('userGender', gender);
-      localStorage.setItem('genderLocked', 'true');
       setGenderLocked(true);
       toast.success('Settings saved! Gender is now locked.');
+    } else if (genderLocked) {
+      toast.info('Gender is locked.');
     } else {
       toast.success('Settings saved!');
     }
-    
     setTimeout(() => navigate('/'), 500);
   };
-  
+
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white pb-20" data-testid="settings-page">
-      {/* Header */}
       <header className="p-6 flex items-center gap-4 border-b border-white/10">
-        <button
-          onClick={() => navigate('/')}
-          className="p-2 rounded-full hover:bg-white/5 transition-colors"
-          data-testid="back-button"
-        >
+        <button onClick={() => navigate('/')} className="p-2 rounded-full hover:bg-white/5 transition-colors" data-testid="back-button">
           <ArrowLeft size={24} />
         </button>
         <h1 className="text-2xl font-bold" style={{ fontFamily: 'Syne, sans-serif' }}>Settings</h1>
       </header>
-      
+
       <div className="p-6 max-w-2xl mx-auto space-y-6">
         {/* Display Name */}
         <div>
           <label className="block text-sm text-gray-400 mb-2">Display Name</label>
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Enter your name"
+          <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Enter your name"
             className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#7c5cfc] transition-all"
-            data-testid="name-input"
-          />
+            data-testid="name-input" />
         </div>
-        
+
         {/* Age */}
         <div>
           <label className="block text-sm text-gray-400 mb-2">Age (Optional)</label>
-          <input
-            type="number"
-            value={age}
-            onChange={(e) => setAge(e.target.value)}
-            placeholder="Enter your age"
+          <input type="number" value={age} onChange={(e) => setAge(e.target.value)} placeholder="Enter your age"
             className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#7c5cfc] transition-all"
-            data-testid="age-input"
-          />
+            data-testid="age-input" />
         </div>
-        
+
         {/* Gender */}
         <div>
           <label className="block text-sm text-gray-400 mb-2">
@@ -97,59 +91,47 @@ const Settings = () => {
           </label>
           <div className="grid grid-cols-3 gap-3">
             {['Male', 'Female', 'Other'].map((g) => (
-              <button
-                key={g}
-                onClick={() => !genderLocked && setGender(g)}
-                disabled={genderLocked}
-                className={`py-3 rounded-xl font-medium transition-all ${
-                  gender === g
-                    ? 'bg-gradient-to-r from-[#7c5cfc] to-[#fc5c7d] text-white'
-                    : 'bg-white/5 text-gray-300 hover:bg-white/10'
-                } ${genderLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
-                data-testid={`gender-${g.toLowerCase()}`}
-              >
+              <button key={g} onClick={() => !genderLocked && setGender(g)} disabled={genderLocked}
+                className={`py-3 rounded-xl font-medium transition-all ${gender === g ? 'bg-gradient-to-r from-[#7c5cfc] to-[#fc5c7d] text-white' : 'bg-white/5 text-gray-300 hover:bg-white/10'} ${genderLocked ? 'opacity-50 cursor-not-allowed' : ''}`}>
                 {g}
               </button>
             ))}
           </div>
-          {genderLocked && (
-            <p className="text-xs text-gray-500 mt-2">Gender cannot be changed once set</p>
-          )}
+          {genderLocked && <p className="text-xs text-gray-500 mt-2">Gender can only be set once to maintain honest connections.</p>}
         </div>
-        
-        {/* Location is auto-detected in background - not shown to user */}
-        
-        {/* Legal Links */}
+
+        {/* City */}
+        <div>
+          <label className="block text-sm text-gray-400 mb-2">City</label>
+          <select value={city} onChange={(e) => setCity(e.target.value)} data-testid="city-select"
+            className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#7c5cfc] transition-all text-white">
+            {CITIES.map((c) => <option key={c} value={c} className="bg-[#1a1a1a]">{c}</option>)}
+          </select>
+        </div>
+
+        {/* Save */}
+        <button onClick={handleSave} data-testid="save-button"
+          className="w-full py-4 rounded-xl font-bold text-lg bg-gradient-to-r from-[#7c5cfc] to-[#fc5c7d] hover:opacity-90 transition-all">
+          Save Settings
+        </button>
+
+        {/* Legal links */}
         <div className="pt-4 border-t border-white/10">
-          <p className="text-sm text-gray-500 mb-3">Legal</p>
-          <div className="space-y-2">
+          <p className="text-xs text-gray-500 text-center mb-3">Legal</p>
+          <div className="grid grid-cols-2 gap-2">
             {[
               { label: 'Terms & Conditions', path: '/terms' },
-              { label: 'Privacy Policy', path: '/privacy' },
-              { label: 'Cookie Policy', path: '/cookies' },
+              { label: 'Privacy Policy',     path: '/privacy' },
+              { label: 'Cookie Policy',      path: '/cookies' },
               { label: 'Community Guidelines', path: '/guidelines' },
             ].map(({ label, path }) => (
-              <button
-                key={path}
-                onClick={() => navigate(path)}
-                className="w-full flex items-center justify-between px-4 py-3 bg-white/5 hover:bg-white/10 rounded-xl transition-colors text-left"
-              >
-                <span className="text-gray-300 text-sm">{label}</span>
-                <span className="text-gray-500 text-sm">→</span>
+              <button key={path} onClick={() => navigate(path)}
+                className="py-2 px-3 text-xs text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-lg transition-all text-left">
+                {label}
               </button>
             ))}
           </div>
         </div>
-
-        {/* Save Button */}
-        <button
-          onClick={handleSave}
-          className="w-full py-4 bg-gradient-to-r from-[#7c5cfc] to-[#fc5c7d] rounded-xl font-bold text-lg hover:shadow-lg hover:shadow-purple-500/20 transition-all"
-          style={{ fontFamily: 'Syne, sans-serif' }}
-          data-testid="save-button"
-        >
-          Save Settings
-        </button>
       </div>
     </div>
   );
