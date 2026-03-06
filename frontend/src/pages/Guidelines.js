@@ -123,7 +123,7 @@ const Guidelines = () => {
         <div>
           <h2 className="text-lg font-bold mb-3 text-white" style={{ fontFamily: 'Syne, sans-serif' }}>Contact</h2>
           <p className="text-gray-300 leading-relaxed text-sm">
-            Questions about these guidelines? Email us at support@stumblechat.online.
+            Questions about these guidelines? Email us at Stumblechat.online@gmail.com.
           </p>
         </div>
 

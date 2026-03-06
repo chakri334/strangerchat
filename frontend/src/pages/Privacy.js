@@ -76,7 +76,7 @@ const Privacy = () => {
             items: [
               "You can clear your profile data at any time by clearing your browser's local storage.",
               "You can use the app without providing a real name — a display name is sufficient.",
-              "To request deletion of any report data associated with your IP address, contact support@stumblechat.online.",
+              "To request deletion of any report data associated with your IP address, contact Stumblechat.online@gmail.com.",
             ]
           },
           {
@@ -84,7 +84,7 @@ const Privacy = () => {
             items: [
               "Stumble Chat is not intended for users under 18 years of age.",
               "We do not knowingly collect data from minors.",
-              "If you believe a minor is using the service, please report it to support@stumblechat.online.",
+              "If you believe a minor is using the service, please report it to Stumblechat.online@gmail.com.",
             ]
           },
           {

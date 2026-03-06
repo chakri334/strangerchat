@@ -61,7 +61,7 @@ const Terms = () => {
           },
           {
             title: "10. Contact",
-            body: "For questions about these Terms, contact us at support@stumblechat.online."
+            body: "For questions about these Terms, contact us at Stumblechat.online@gmail.com."
           }
         ].map(({ title, body }) => (
           <div key={title}>

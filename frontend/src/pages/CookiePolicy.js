@@ -103,7 +103,7 @@ const CookiePolicy = () => {
         <div>
           <h2 className="text-lg font-bold mb-3 text-white" style={{ fontFamily: 'Syne, sans-serif' }}>5. Contact</h2>
           <p className="text-gray-300 leading-relaxed">
-            For questions about our use of cookies, contact us at support@stumblechat.online.
+            For questions about our use of cookies, contact us at Stumblechat.online@gmail.com.
           </p>
         </div>
 
