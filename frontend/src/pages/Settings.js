@@ -100,14 +100,7 @@ const Settings = () => {
           {genderLocked && <p className="text-xs text-gray-500 mt-2">Gender can only be set once to maintain honest connections.</p>}
         </div>
 
-        {/* City */}
-        <div>
-          <label className="block text-sm text-gray-400 mb-2">City</label>
-          <select value={city} onChange={(e) => setCity(e.target.value)} data-testid="city-select"
-            className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#7c5cfc] transition-all text-white">
-            {CITIES.map((c) => <option key={c} value={c} className="bg-[#1a1a1a]">{c}</option>)}
-          </select>
-        </div>
+
 
         {/* Save */}
         <button onClick={handleSave} data-testid="save-button"
