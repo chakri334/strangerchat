@@ -1,6 +1,12 @@
 User-agent: *
 Allow: /
+Allow: /guidelines
+Allow: /privacy
+Allow: /terms
+Allow: /cookies
+Disallow: /settings
 Disallow: /api/
+Disallow: /socket.io/
+Crawl-delay: 10
 
-# Point crawlers to the sitemap
 Sitemap: https://stumblechat.online/sitemap.xml

@@ -5,7 +5,9 @@
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="theme-color" content="#7c5cfc" />
 
-        <!-- PRIMARY SEO META TAGS -->
+        <!-- =====================================================
+             PRIMARY SEO META TAGS
+        ====================================================== -->
         <title>Stumble Chat – Free Random Chat with Strangers Online | Meet New People</title>
         <meta name="description" content="Stumble Chat is a free random chat app that connects you with strangers worldwide. Meet new people, share photos, and have real conversations instantly – no sign-up required." />
         <meta name="keywords" content="random chat, stranger chat, meet new people, free chat, anonymous chat, online chat, omegle alternative, chat with strangers, make friends online, free random video chat" />
@@ -14,12 +16,16 @@
         <meta name="googlebot" content="index, follow" />
         <link rel="canonical" href="https://stumblechat.online/" />
 
-        <!-- GEO / GEOGRAPHIC TARGETING TAGS -->
+        <!-- =====================================================
+             GEO / GEOGRAPHIC TARGETING
+        ====================================================== -->
         <meta name="geo.region" content="US" />
         <meta name="geo.placename" content="Worldwide" />
         <meta name="DC.language" content="en" />
 
-        <!-- OPEN GRAPH -->
+        <!-- =====================================================
+             OPEN GRAPH (Facebook, WhatsApp, LinkedIn etc.)
+        ====================================================== -->
         <meta property="og:type" content="website" />
         <meta property="og:url" content="https://stumblechat.online/" />
         <meta property="og:title" content="Stumble Chat – Free Random Chat with Strangers Online" />
@@ -34,24 +40,42 @@
         <meta property="og:locale:alternate" content="en_GB" />
         <meta property="og:locale:alternate" content="en_AU" />
 
-        <!-- TWITTER / X CARD -->
+        <!-- =====================================================
+             TWITTER / X CARD
+        ====================================================== -->
         <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:site" content="@stumblechat" />
         <meta name="twitter:title" content="Stumble Chat – Free Random Chat with Strangers Online" />
         <meta name="twitter:description" content="Connect with random strangers instantly. Free anonymous chat, photo sharing, and real conversations worldwide. No sign-up needed!" />
         <meta name="twitter:image" content="https://stumblechat.online/og-image.png" />
         <meta name="twitter:image:alt" content="Stumble Chat – Meet Strangers Online" />
 
-        <!-- HREFLANG – INTERNATIONAL SEO -->
+        <!-- =====================================================
+             HREFLANG – INTERNATIONAL SEO
+        ====================================================== -->
         <link rel="alternate" hreflang="x-default" href="https://stumblechat.online/" />
-        <link rel="alternate" hreflang="en" href="https://stumblechat.online/" />
-        <link rel="alternate" hreflang="en-US" href="https://stumblechat.online/" />
-        <link rel="alternate" hreflang="en-IN" href="https://stumblechat.online/" />
-        <link rel="alternate" hreflang="en-GB" href="https://stumblechat.online/" />
-        <link rel="alternate" hreflang="en-AU" href="https://stumblechat.online/" />
-        <link rel="alternate" hreflang="en-CA" href="https://stumblechat.online/" />
-        <link rel="manifest" href="https://stumblechat.online/manifest.json" />
+        <link rel="alternate" hreflang="en"         href="https://stumblechat.online/" />
+        <link rel="alternate" hreflang="en-US"      href="https://stumblechat.online/" />
+        <link rel="alternate" hreflang="en-IN"      href="https://stumblechat.online/" />
+        <link rel="alternate" hreflang="en-GB"      href="https://stumblechat.online/" />
+        <link rel="alternate" hreflang="en-AU"      href="https://stumblechat.online/" />
+        <link rel="alternate" hreflang="en-CA"      href="https://stumblechat.online/" />
 
-        <!-- JSON-LD STRUCTURED DATA: WebApplication -->
+        <!-- =====================================================
+             FAVICON & PWA ICONS  ← FIXED (was missing entirely)
+             favicon.svg  – sharp at any size, modern browsers
+             favicon.ico  – fallback for Safari / older browsers
+             apple-touch-icon.png – iOS "Add to Home Screen"
+             manifest.json – relative path (was absolute URL before)
+        ====================================================== -->
+        <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+        <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+        <link rel="manifest" href="/manifest.json" />
+
+        <!-- =====================================================
+             JSON-LD STRUCTURED DATA: WebApplication
+        ====================================================== -->
         <script type="application/ld+json">
         {
           "@context": "https://schema.org",
@@ -89,7 +113,12 @@
           "@type": "Organization",
           "name": "Stumble Chat",
           "url": "https://stumblechat.online/",
-          "logo": "https://stumblechat.online/logo192.png"
+          "logo": "https://stumblechat.online/apple-touch-icon.png",
+          "contactPoint": {
+            "@type": "ContactPoint",
+            "email": "support@stumblechat.online",
+            "contactType": "customer support"
+          }
         }
         </script>
 
@@ -130,12 +159,22 @@
                 "@type": "Answer",
                 "text": "Yes! Stumble Chat uses location-based matching to first try connecting you with people from the same city, then expands globally if no local match is found."
               }
+            },
+            {
+              "@type": "Question",
+              "name": "Do I need to sign up to use Stumble Chat?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "No sign-up required. Just pick a display name and start chatting instantly with strangers worldwide."
+              }
             }
           ]
         }
         </script>
 
-        <!-- PWA / APP META TAGS -->
+        <!-- =====================================================
+             PWA / APP META TAGS
+        ====================================================== -->
         <meta name="application-name" content="Stumble Chat" />
         <meta name="apple-mobile-web-app-title" content="Stumble Chat" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -145,7 +184,6 @@
 
         <!-- =====================================================
              PERFORMANCE FIX 1: Preconnect for critical origins
-             Tells browser to open connections early
         ====================================================== -->
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -155,8 +193,6 @@
 
         <!-- =====================================================
              PERFORMANCE FIX 2: Non-blocking font loading
-             Replaces render-blocking <link rel="stylesheet">
-             Uses print media trick: loads async, swaps to all
         ====================================================== -->
         <link rel="preload" as="style"
               href="https://fonts.googleapis.com/css2?family=Syne:wght@700&display=swap" />
@@ -167,7 +203,6 @@
           <link rel="stylesheet"
                 href="https://fonts.googleapis.com/css2?family=Syne:wght@700&display=swap" />
         </noscript>
-        <!-- Fallback font stack in CSS so text renders instantly -->
         <style>
           body { font-family: system-ui, -apple-system, sans-serif; }
           [style*="Syne"], .font-syne { font-family: 'Syne', system-ui, sans-serif; }
@@ -175,11 +210,8 @@
 
         <!-- =====================================================
              PERFORMANCE FIX 3: Deferred GA4 load
-             async already set; gtag queues events until ready
-             Move gtag init inline so it doesn't block
         ====================================================== -->
         <script>
-            // Queue GA4 events immediately (non-blocking)
             window.dataLayer = window.dataLayer || [];
             function gtag(){dataLayer.push(arguments);}
             gtag('js', new Date());
@@ -189,7 +221,6 @@
                 'cookie_flags': 'SameSite=None;Secure'
             });
         </script>
-        <!-- Load GA4 script after page is interactive -->
         <script>
             window.addEventListener('load', function() {
                 var s = document.createElement('script');
@@ -226,9 +257,6 @@
 
         <!-- =====================================================
              PERFORMANCE FIX 4: Inline LCP placeholder
-             Gives Lighthouse something to measure as LCP
-             immediately — before React bundle loads.
-             Disappears the instant React mounts.
         ====================================================== -->
         <div id="root">
             <div style="min-height:100vh;background:#0a0a0a;display:flex;flex-direction:column;align-items:center;justify-content:center;">
@@ -241,10 +269,6 @@
 
         <!-- =====================================================
              PERFORMANCE FIX 5: PostHog deferred 3 seconds
-             PostHog was using 202 KiB / 396ms main thread
-             at page load. Deferring 3s removes it from the
-             critical path entirely, saving ~400ms on FCP/LCP.
-             All analytics still captured — just delayed init.
         ====================================================== -->
         <script>
             window.addEventListener('load', function() {
@@ -259,19 +283,13 @@
                                     var o = e.split(".");
                                     2 == o.length && ((t = t[o[0]]), (e = o[1])),
                                         (t[e] = function () {
-                                            t.push(
-                                                [e].concat(
-                                                    Array.prototype.slice.call(arguments, 0),
-                                                ),
-                                            );
+                                            t.push([e].concat(Array.prototype.slice.call(arguments, 0)));
                                         });
                                 }
                                 ((p = t.createElement("script")).type = "text/javascript"),
                                     (p.crossOrigin = "anonymous"),
                                     (p.async = !0),
-                                    (p.src =
-                                        s.api_host.replace(".i.posthog.com", "-assets.i.posthog.com") +
-                                        "/static/array.js"),
+                                    (p.src = s.api_host.replace(".i.posthog.com", "-assets.i.posthog.com") + "/static/array.js"),
                                     (r = t.getElementsByTagName("script")[0]).parentNode.insertBefore(p, r);
                                 var u = e;
                                 for (
@@ -279,15 +297,9 @@
                                         u.people = u.people || [],
                                         u.toString = function (t) {
                                             var e = "posthog";
-                                            return (
-                                                "posthog" !== a && (e += "." + a),
-                                                t || (e += " (stub)"),
-                                                e
-                                            );
+                                            return ("posthog" !== a && (e += "." + a), t || (e += " (stub)"), e);
                                         },
-                                        u.people.toString = function () {
-                                            return u.toString(1) + ".people (stub)";
-                                        },
+                                        u.people.toString = function () { return u.toString(1) + ".people (stub)"; },
                                         o = "init me ws ys ps bs capture je Di ks register register_once register_for_session unregister unregister_for_session Ps getFeatureFlag getFeatureFlagPayload isFeatureEnabled reloadFeatureFlags updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures on onFeatureFlags onSurveysLoaded onSessionId getSurveys getActiveMatchingSurveys renderSurvey canRenderSurvey canRenderSurveyAsync identify setPersonProperties group resetGroups setPersonPropertiesForFlags resetPersonPropertiesForFlags setGroupPropertiesForFlags resetGroupPropertiesForFlags reset get_distinct_id getGroups get_session_id get_session_replay_url alias set_config startSessionRecording stopSessionRecording sessionRecordingStarted captureException loadToolbar get_property getSessionProperty Es $s createPersonProfile Is opt_in_capturing opt_out_capturing has_opted_in_capturing has_opted_out_capturing clear_opt_in_out_capturing Ss debug xs getPageViewId captureTraceFeedback captureTraceMetric".split(" "),
                                         n = 0;
                                     n < o.length;
@@ -301,14 +313,13 @@
                     posthog.init("phc_xAvL2Iq4tFmANRE7kzbKwaSqp1HJjN7x48s3vr0CMjs", {
                         api_host: "https://us.i.posthog.com",
                         person_profiles: "identified_only",
-                        // Disable session recorder to save 88 KiB
                         disable_session_recording: true,
                         session_recording: {
                             recordCrossOriginIframes: false,
                             capturePerformance: false,
                         },
                     });
-                }, 3000); // Wait 3s after load — well after FCP/LCP measured
+                }, 3000);
             });
         </script>
     </body>

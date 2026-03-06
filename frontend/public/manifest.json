@@ -1,1 +1,27 @@
-{ "name": "StumbleChat", "short_name": "Chat", "start_url": "/", "display": "standalone", "background_color": "#ffffff", "theme_color": "#000000", "icons": [ { "src": "/public/icons/icon-192x192.png", "sizes": "192x192", "type": "image/png" }, { "src": "/public/icons/icon-512x512.png", "sizes": "512x512", "type": "image/png" } ] }
+{
+  "name": "Stumble Chat",
+  "short_name": "Stumble Chat",
+  "description": "Free random chat with strangers online. Meet new people instantly – no sign-up required.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0a0a0a",
+  "theme_color": "#7c5cfc",
+  "lang": "en",
+  "scope": "/",
+  "categories": ["social", "communication"],
+  "icons": [
+    {
+      "src": "/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
