@@ -1,0 +1,127 @@
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Shield, Users, Camera, AlertTriangle } from 'lucide-react';
+
+const OnboardingModal = ({ onAccept }) => {
+  const navigate = useNavigate();
+  const [checked, setChecked] = useState(false);
+
+  const handleAccept = () => {
+    if (!checked) return;
+    localStorage.setItem('hasSeenOnboarding', 'true');
+    onAccept();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4">
+      <div className="bg-[#111111] rounded-2xl max-w-md w-full border border-white/10 overflow-hidden">
+
+        {/* Header */}
+        <div className="bg-gradient-to-r from-[#7c5cfc]/20 to-[#fc5c7d]/20 p-6 text-center border-b border-white/10">
+          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#7c5cfc] to-[#fc5c7d] flex items-center justify-center mx-auto mb-4">
+            <span className="text-2xl">👋</span>
+          </div>
+          <h2 className="text-2xl font-bold text-white mb-1" style={{ fontFamily: 'Syne, sans-serif' }}>
+            Welcome to Stumble Chat
+          </h2>
+          <p className="text-gray-400 text-sm">Before you start, here's what you need to know</p>
+        </div>
+
+        {/* Rules */}
+        <div className="p-6 space-y-4">
+          {[
+            {
+              icon: <Shield size={20} className="text-[#7c5cfc]" />,
+              title: "You must be 18+",
+              desc: "Stumble Chat is for adults only. Minors are not permitted."
+            },
+            {
+              icon: <Users size={20} className="text-green-400" />,
+              title: "Be respectful",
+              desc: "Treat every stranger with kindness. Harassment and hate speech will result in a ban."
+            },
+            {
+              icon: <Camera size={20} className="text-[#fc5c7d]" />,
+              title: "No explicit content",
+              desc: "Do not share explicit, offensive, or illegal photos or messages."
+            },
+            {
+              icon: <AlertTriangle size={20} className="text-yellow-400" />,
+              title: "Stay safe",
+              desc: "Never share your real name, phone number, address, or financial details."
+            },
+          ].map(({ icon, title, desc }) => (
+            <div key={title} className="flex gap-4 items-start">
+              <div className="w-9 h-9 rounded-full bg-white/5 flex items-center justify-center flex-shrink-0 mt-0.5">
+                {icon}
+              </div>
+              <div>
+                <p className="font-semibold text-white text-sm">{title}</p>
+                <p className="text-gray-400 text-xs leading-relaxed mt-0.5">{desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Checkbox */}
+        <div className="px-6 pb-4">
+          <label className="flex items-start gap-3 cursor-pointer group">
+            <div
+              onClick={() => setChecked(!checked)}
+              className={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 mt-0.5 border transition-all ${
+                checked
+                  ? 'bg-gradient-to-r from-[#7c5cfc] to-[#fc5c7d] border-transparent'
+                  : 'border-white/30 bg-white/5 group-hover:border-white/50'
+              }`}
+            >
+              {checked && <span className="text-white text-xs font-bold">✓</span>}
+            </div>
+            <span className="text-gray-300 text-sm leading-relaxed">
+              I am 18 or older and I agree to the{' '}
+              <button
+                onClick={(e) => { e.stopPropagation(); navigate('/terms'); }}
+                className="text-[#7c5cfc] hover:underline"
+              >
+                Terms & Conditions
+              </button>
+              ,{' '}
+              <button
+                onClick={(e) => { e.stopPropagation(); navigate('/privacy'); }}
+                className="text-[#7c5cfc] hover:underline"
+              >
+                Privacy Policy
+              </button>
+              , and{' '}
+              <button
+                onClick={(e) => { e.stopPropagation(); navigate('/guidelines'); }}
+                className="text-[#7c5cfc] hover:underline"
+              >
+                Community Guidelines
+              </button>
+              .
+            </span>
+          </label>
+        </div>
+
+        {/* Button */}
+        <div className="px-6 pb-6">
+          <button
+            onClick={handleAccept}
+            disabled={!checked}
+            className={`w-full py-4 rounded-xl font-bold text-lg transition-all ${
+              checked
+                ? 'bg-gradient-to-r from-[#7c5cfc] to-[#fc5c7d] hover:shadow-lg hover:shadow-purple-500/20 text-white'
+                : 'bg-white/10 text-gray-500 cursor-not-allowed'
+            }`}
+            style={{ fontFamily: 'Syne, sans-serif' }}
+          >
+            I Understand — Let's Chat
+          </button>
+        </div>
+
+      </div>
+    </div>
+  );
+};
+
+export default OnboardingModal;
