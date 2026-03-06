@@ -3,22 +3,45 @@
         xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
     <loc>https://stumblechat.online/</loc>
-    <lastmod>2026-03-05</lastmod>
+    <lastmod>2026-03-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
-    <!-- Hreflang annotations for international SEO -->
     <xhtml:link rel="alternate" hreflang="x-default" href="https://stumblechat.online/"/>
-    <xhtml:link rel="alternate" hreflang="en"    href="https://stumblechat.online/"/>
-    <xhtml:link rel="alternate" hreflang="en-US" href="https://stumblechat.online/"/>
-    <xhtml:link rel="alternate" hreflang="en-IN" href="https://stumblechat.online/"/>
-    <xhtml:link rel="alternate" hreflang="en-GB" href="https://stumblechat.online/"/>
-    <xhtml:link rel="alternate" hreflang="en-AU" href="https://stumblechat.online/"/>
-    <xhtml:link rel="alternate" hreflang="en-CA" href="https://stumblechat.online/"/>
+    <xhtml:link rel="alternate" hreflang="en"        href="https://stumblechat.online/"/>
+    <xhtml:link rel="alternate" hreflang="en-IN"     href="https://stumblechat.online/"/>
+    <xhtml:link rel="alternate" hreflang="en-US"     href="https://stumblechat.online/"/>
+    <xhtml:link rel="alternate" hreflang="en-GB"     href="https://stumblechat.online/"/>
+    <xhtml:link rel="alternate" hreflang="en-AU"     href="https://stumblechat.online/"/>
+    <xhtml:link rel="alternate" hreflang="en-CA"     href="https://stumblechat.online/"/>
   </url>
   <url>
     <loc>https://stumblechat.online/settings</loc>
-    <lastmod>2026-03-05</lastmod>
+    <lastmod>2026-03-06</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://stumblechat.online/terms</loc>
+    <lastmod>2026-03-06</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://stumblechat.online/privacy</loc>
+    <lastmod>2026-03-06</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://stumblechat.online/cookies</loc>
+    <lastmod>2026-03-06</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.2</priority>
+  </url>
+  <url>
+    <loc>https://stumblechat.online/guidelines</loc>
+    <lastmod>2026-03-06</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
   </url>
 </urlset>
