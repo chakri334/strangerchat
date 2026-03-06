@@ -67,13 +67,15 @@ const OnboardingModal = ({ onAccept }) => {
 
         {/* Checkbox */}
         <div className="px-6 pb-4">
-          <label className="flex items-start gap-3 cursor-pointer group">
+          <div className="flex items-start gap-3">
+            {/* Standalone checkbox div — NOT inside a label so clicking
+                the legal links doesn't accidentally toggle the checkbox */}
             <div
               onClick={() => setChecked(!checked)}
-              className={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 mt-0.5 border transition-all ${
+              className={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 mt-0.5 border transition-all cursor-pointer ${
                 checked
                   ? 'bg-gradient-to-r from-[#7c5cfc] to-[#fc5c7d] border-transparent'
-                  : 'border-white/30 bg-white/5 group-hover:border-white/50'
+                  : 'border-white/30 bg-white/5 hover:border-white/50'
               }`}
             >
               {checked && <span className="text-white text-xs font-bold">✓</span>}
@@ -81,28 +83,28 @@ const OnboardingModal = ({ onAccept }) => {
             <span className="text-gray-300 text-sm leading-relaxed">
               I am 18 or older and I agree to the{' '}
               <button
-                onClick={(e) => { e.stopPropagation(); openPage('/terms'); }}
+                onClick={() => openPage('/terms')}
                 className="text-[#7c5cfc] hover:underline"
               >
                 Terms & Conditions
               </button>
               ,{' '}
               <button
-                onClick={(e) => { e.stopPropagation(); openPage('/privacy'); }}
+                onClick={() => openPage('/privacy')}
                 className="text-[#7c5cfc] hover:underline"
               >
                 Privacy Policy
               </button>
               , and{' '}
               <button
-                onClick={(e) => { e.stopPropagation(); openPage('/guidelines'); }}
+                onClick={() => openPage('/guidelines')}
                 className="text-[#7c5cfc] hover:underline"
               >
                 Community Guidelines
               </button>
               .
             </span>
-          </label>
+          </div>
         </div>
 
         {/* Button */}
