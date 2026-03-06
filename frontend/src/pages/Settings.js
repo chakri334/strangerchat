@@ -119,6 +119,28 @@ const Settings = () => {
         
         {/* Location is auto-detected in background - not shown to user */}
         
+        {/* Legal Links */}
+        <div className="pt-4 border-t border-white/10">
+          <p className="text-sm text-gray-500 mb-3">Legal</p>
+          <div className="space-y-2">
+            {[
+              { label: 'Terms & Conditions', path: '/terms' },
+              { label: 'Privacy Policy', path: '/privacy' },
+              { label: 'Cookie Policy', path: '/cookies' },
+              { label: 'Community Guidelines', path: '/guidelines' },
+            ].map(({ label, path }) => (
+              <button
+                key={path}
+                onClick={() => navigate(path)}
+                className="w-full flex items-center justify-between px-4 py-3 bg-white/5 hover:bg-white/10 rounded-xl transition-colors text-left"
+              >
+                <span className="text-gray-300 text-sm">{label}</span>
+                <span className="text-gray-500 text-sm">→</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Save Button */}
         <button
           onClick={handleSave}
