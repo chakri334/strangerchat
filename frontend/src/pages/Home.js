@@ -7,6 +7,7 @@ import WaitingPage from '../components/WaitingPage';
 import { Settings as SettingsIcon } from 'lucide-react';
 import { Analytics } from '../utils/analytics';
 import { setGeoTitle, trackCitySearch, trackGeoMatch } from '../utils/seo';
+import OnboardingModal from '../components/OnboardingModal';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -30,6 +31,9 @@ const Home = () => {
   const [isBlocked, setIsBlocked] = useState(false);
   const [blockMessage, setBlockMessage] = useState('');
   const [isConnected, setIsConnected] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(
+    () => !localStorage.getItem('hasSeenOnboarding')
+  );
   const socketRef = useRef(null);
   const searchTimerRef = useRef(null);   // tracks the active search timeout
   const searchCountRef = useRef(0);      // prevents stale closure bug on isSearching
@@ -382,6 +386,11 @@ const Home = () => {
   };
 
   // Show waiting page when searching
+  // Show onboarding on first visit
+  if (showOnboarding) {
+    return <OnboardingModal onAccept={() => setShowOnboarding(false)} />;
+  }
+
   if (isSearching && !chatActive) {
     return <WaitingPage onCancel={handleCancelSearch} />;
   }
