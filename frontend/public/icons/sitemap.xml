@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:xhtml="http://www.w3.org/1999/xhtml">
+
+  <!-- HOME -->
+  <url>
+    <loc>https://stumblechat.online/</loc>
+    <lastmod>2026-03-06</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://stumblechat.online/"/>
+    <xhtml:link rel="alternate" hreflang="en"        href="https://stumblechat.online/"/>
+    <xhtml:link rel="alternate" hreflang="en-US"     href="https://stumblechat.online/"/>
+    <xhtml:link rel="alternate" hreflang="en-IN"     href="https://stumblechat.online/"/>
+    <xhtml:link rel="alternate" hreflang="en-GB"     href="https://stumblechat.online/"/>
+    <xhtml:link rel="alternate" hreflang="en-AU"     href="https://stumblechat.online/"/>
+    <xhtml:link rel="alternate" hreflang="en-CA"     href="https://stumblechat.online/"/>
+  </url>
+
+  <!-- COMMUNITY GUIDELINES – real content, builds trust signals -->
+  <url>
+    <loc>https://stumblechat.online/guidelines</loc>
+    <lastmod>2026-03-06</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://stumblechat.online/guidelines"/>
+    <xhtml:link rel="alternate" hreflang="en"        href="https://stumblechat.online/guidelines"/>
+  </url>
+
+  <!-- PRIVACY POLICY -->
+  <url>
+    <loc>https://stumblechat.online/privacy</loc>
+    <lastmod>2026-03-06</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://stumblechat.online/privacy"/>
+    <xhtml:link rel="alternate" hreflang="en"        href="https://stumblechat.online/privacy"/>
+  </url>
+
+  <!-- TERMS & CONDITIONS -->
+  <url>
+    <loc>https://stumblechat.online/terms</loc>
+    <lastmod>2026-03-06</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://stumblechat.online/terms"/>
+    <xhtml:link rel="alternate" hreflang="en"        href="https://stumblechat.online/terms"/>
+  </url>
+
+  <!-- COOKIE POLICY -->
+  <url>
+    <loc>https://stumblechat.online/cookies</loc>
+    <lastmod>2026-03-06</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://stumblechat.online/cookies"/>
+    <xhtml:link rel="alternate" hreflang="en"        href="https://stumblechat.online/cookies"/>
+  </url>
+
+  <!-- SETTINGS – noindex in meta but listed with very low priority -->
+  <url>
+    <loc>https://stumblechat.online/settings</loc>
+    <lastmod>2026-03-06</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.2</priority>
+  </url>
+
+</urlset>
