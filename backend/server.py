@@ -58,7 +58,7 @@ from contextlib import asynccontextmanager
 async def lifespan(app_instance):
     bot_task = None
     telegram_token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
-    if telegram_token:
+    if telegram_token and telegram_token != "your_bot_token_here":
         try:
             from bot import run_bot
             # Wait briefly to catch immediate startup errors
@@ -66,13 +66,16 @@ async def lifespan(app_instance):
             await asyncio.sleep(3)
             if bot_task.done():
                 exc = bot_task.exception()
-                logger.error(f"Telegram bot crashed on startup: {exc}")
+                if exc:
+                    logger.error(f"Telegram bot crashed on startup: {exc}")
             else:
                 logger.info("Telegram bot started successfully")
+        except ImportError as e:
+            logger.error(f"Failed to import Telegram bot (missing dependency): {e}")
         except Exception as e:
-            logger.error(f"Failed to import/start Telegram bot: {e}", exc_info=True)
+            logger.error(f"Failed to start Telegram bot: {e}")
     else:
-        logger.warning("TELEGRAM_BOT_TOKEN not set — Telegram bot disabled")
+        logger.info("Telegram bot disabled (no token configured)")
 
     yield
 
