@@ -52,7 +52,33 @@ sio = socketio.AsyncServer(
 )
 
 # FastAPI app
-app = FastAPI()
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app_instance):
+    bot_task = None
+    telegram_token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+    if telegram_token:
+        try:
+            from bot import run_bot
+            bot_task = asyncio.create_task(run_bot())
+            logger.info("Telegram bot started successfully")
+        except Exception as e:
+            logger.error(f"Failed to start Telegram bot: {e}")
+    else:
+        logger.warning("TELEGRAM_BOT_TOKEN not set — Telegram bot disabled")
+    
+    yield
+    
+    if bot_task:
+        bot_task.cancel()
+        try:
+            await bot_task
+        except asyncio.CancelledError:
+            pass
+        logger.info("Telegram bot stopped")
+
+app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
