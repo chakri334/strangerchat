@@ -43,15 +43,15 @@ sio = socketio.AsyncServer(
     cors_allowed_origins='*',
     logger=False,
     engineio_logger=False,
-    transports=['websocket', 'polling'],  # WebSocket first, polling fallback
-    ping_timeout=60,        # Declare dead after 60s of no pong (was 120s — too slow to detect drops)
-    ping_interval=20,       # Ping every 20s — catches mobile background drops faster
-    max_http_buffer_size=10*1024*1024,  # 10MB for photos
+    transports=['websocket', 'polling'],
+    ping_timeout=60,
+    ping_interval=20,
+    max_http_buffer_size=10*1024*1024,
     async_handlers=True,
     always_connect=True
 )
 
-# FastAPI app
+# FastAPI app with lifespan to start Telegram bot
 from contextlib import asynccontextmanager
 
 @asynccontextmanager
@@ -61,16 +61,22 @@ async def lifespan(app_instance):
     if telegram_token:
         try:
             from bot import run_bot
+            # Wait briefly to catch immediate startup errors
             bot_task = asyncio.create_task(run_bot())
-            logger.info("Telegram bot started successfully")
+            await asyncio.sleep(3)
+            if bot_task.done():
+                exc = bot_task.exception()
+                logger.error(f"Telegram bot crashed on startup: {exc}")
+            else:
+                logger.info("Telegram bot started successfully")
         except Exception as e:
-            logger.error(f"Failed to start Telegram bot: {e}")
+            logger.error(f"Failed to import/start Telegram bot: {e}", exc_info=True)
     else:
         logger.warning("TELEGRAM_BOT_TOKEN not set — Telegram bot disabled")
-    
+
     yield
-    
-    if bot_task:
+
+    if bot_task and not bot_task.done():
         bot_task.cancel()
         try:
             await bot_task
@@ -136,7 +142,7 @@ async def get_stats():
     
     return {
         'online': total_online,
-        'chats_today': total_chats * 10,  # Mock multiplier for demo
+        'chats_today': total_chats * 10,
         'cities': total_cities,
         'city_counts': city_users
     }
@@ -147,13 +153,11 @@ async def connect(sid, environ):
     print(f'[SOCKET] Client connected: {sid}', flush=True)
     logger.info(f'Client connected: {sid}')
     
-    # Extract and store IP address
     client_ip = environ.get('HTTP_X_FORWARDED_FOR', environ.get('REMOTE_ADDR', 'unknown'))
     if ',' in str(client_ip):
         client_ip = client_ip.split(',')[0].strip()
     user_ip_map[sid] = client_ip
     
-    # Check if IP is blocked
     now = datetime.now(timezone.utc)
     if client_ip in ip_blocks and ip_blocks[client_ip] > now:
         print(f'[SOCKET] Blocked IP attempted connection: {client_ip}', flush=True)
@@ -163,7 +167,6 @@ async def connect(sid, environ):
         await sio.disconnect(sid)
         return False
     
-    # Send stats immediately
     await broadcast_stats()
 
 @sio.event  
@@ -171,24 +174,20 @@ async def disconnect(sid):
     print(f'[SOCKET] Client disconnected: {sid}', flush=True)
     logger.info(f'Client disconnected: {sid}')
     
-    # Remove from active connections
     if sid in active_connections:
         user_data = active_connections[sid]
         city = user_data.get('city', 'Unknown')
         
-        # Decrease city count
         if city in city_users:
             city_users[city] = max(0, city_users[city] - 1)
             if city_users[city] == 0:
                 del city_users[city]
         
-        # Remove from waiting queue
         if city in waiting_queue and sid in waiting_queue[city]:
             waiting_queue[city].remove(sid)
             if not waiting_queue[city]:
                 del waiting_queue[city]
         
-        # Notify partner if in active chat
         if sid in user_rooms:
             room_id = user_rooms[sid]
             if room_id in active_chats:
@@ -200,11 +199,9 @@ async def disconnect(sid):
         
         del active_connections[sid]
     
-    # Clean up IP mapping
     if sid in user_ip_map:
         del user_ip_map[sid]
     
-    # Broadcast updated stats
     await broadcast_stats()
 
 @sio.on('register_user')
@@ -218,9 +215,6 @@ async def handle_register_user(sid, data):
     print(f'[SOCKET] Registering user {sid}: name={name}, city={city}', flush=True)
     logger.info(f'Registering user {sid}: name={name}, city={city}')
     
-    # BUG FIX: If this sid is already registered (reconnect scenario),
-    # decrement the old city count before re-registering.
-    # Without this, every reconnect inflates the online/city counts.
     if sid in active_connections:
         old_city = active_connections[sid].get('city', 'Global')
         if old_city in city_users:
@@ -237,7 +231,6 @@ async def handle_register_user(sid, data):
         'emoji': random.choice(['😊', '😎', '🤗', '😺', '🦊', '🐼', '🦄', '🌟'])
     }
     
-    # Update city count
     city_users[city] = city_users.get(city, 0) + 1
     
     print(f'[SOCKET] User {sid} registered in {city}. Total in city: {city_users[city]}', flush=True)
@@ -258,15 +251,12 @@ async def handle_join_queue(sid, data):
         print(f'[SOCKET] User {sid} not registered, cannot join queue', flush=True)
         return
     
-    # CRITICAL: Check if user is already in a chat
     if sid in user_rooms:
         print(f'[SOCKET] User {sid} already in a chat, cannot join queue', flush=True)
         return
     
-    # Update user city
     active_connections[sid]['city'] = city
     
-    # Remove user from ALL queues first (prevent duplicates across cities)
     for queue_city, users in list(waiting_queue.items()):
         if sid in users:
             users.remove(sid)
@@ -274,20 +264,15 @@ async def handle_join_queue(sid, data):
             if not users:
                 del waiting_queue[queue_city]
     
-    # Add to waiting queue
     if city not in waiting_queue:
         waiting_queue[city] = []
     
     waiting_queue[city].append(sid)
     
     print(f'[SOCKET] User {sid} joined queue for {city}. Queue size: {len(waiting_queue[city])}', flush=True)
-    print(f'[SOCKET] Current queue for {city}: {waiting_queue[city]}', flush=True)
     logger.info(f'User {sid} joined queue for {city}. Queue size: {len(waiting_queue[city])}')
     
-    # Try to match immediately in same city
     await try_match(city)
-    
-    # If still waiting after 5 seconds, try matching with any city
     asyncio.create_task(try_global_match_after_delay(sid, 5))
 
 @sio.on('send_message')
@@ -303,9 +288,6 @@ async def handle_send_message(sid, data):
     message = data.get('message', '')
     timestamp = datetime.now(timezone.utc).isoformat()
     
-    print(f'[MESSAGE] User {sid} in room {room_id} sending: "{message[:50]}..."' if len(message) > 50 else f'[MESSAGE] User {sid} in room {room_id} sending: "{message}"', flush=True)
-    
-    # Send to partner only
     if room_id in active_chats:
         partner_sid = [s for s in active_chats[room_id] if s != sid]
         if partner_sid:
@@ -315,12 +297,9 @@ async def handle_send_message(sid, data):
                 'timestamp': timestamp,
                 'from': 'partner'
             }, room=partner_sid[0])
-            print(f'[MESSAGE] Message sent successfully to {partner_sid[0]}', flush=True)
         else:
-            print(f'[MESSAGE] No partner found in room {room_id}', flush=True)
             await sio.emit('error', {'message': 'Partner not found'}, room=sid)
     else:
-        print(f'[MESSAGE] Room {room_id} not in active_chats', flush=True)
         await sio.emit('error', {'message': 'Chat room expired'}, room=sid)
 
 @sio.on('send_photo')
@@ -328,26 +307,22 @@ async def handle_send_photo(sid, data):
     print(f'[PHOTO] Received photo from {sid}', flush=True)
     
     if sid not in user_rooms:
-        print(f'[PHOTO] User {sid} not in any room!', flush=True)
         return
     
     room_id = user_rooms[sid]
     photo_data = data.get('photo', '')
     
     if not photo_data:
-        print(f'[PHOTO] No photo data received from {sid}', flush=True)
         return
     
     photo_size_kb = len(photo_data) / 1024
     print(f'[PHOTO] Photo size: {photo_size_kb:.1f} KB', flush=True)
     
-    # Send to partner
     if room_id in active_chats:
         partner_sid = [s for s in active_chats[room_id] if s != sid]
         if partner_sid:
             photo_id = str(uuid.uuid4())
             
-            # Store photo tracking info
             photo_messages[photo_id] = {
                 'sender_sid': sid,
                 'receiver_sid': partner_sid[0],
@@ -358,27 +333,18 @@ async def handle_send_photo(sid, data):
                 'created_at': datetime.now(timezone.utc)
             }
             
-            # Notify sender that photo was sent (show as thumbnail)
             await sio.emit('photo_sent', {
                 'photo': photo_data,
                 'photo_id': photo_id
             }, room=sid)
-            print(f'[PHOTO] Sent photo_sent event to sender {sid}', flush=True)
             
-            # Notify receiver
             await sio.emit('new_photo', {
                 'photo': photo_data,
                 'photo_id': photo_id
             }, room=partner_sid[0])
-            print(f'[PHOTO] Sent new_photo event to receiver {partner_sid[0]}', flush=True)
-        else:
-            print(f'[PHOTO] No partner found in room {room_id}', flush=True)
-    else:
-        print(f'[PHOTO] Room {room_id} not in active_chats', flush=True)
 
 @sio.on('photo_opened')
 async def handle_photo_opened(sid, data):
-    """Handle when a user opens a photo - start 15s timer for both"""
     photo_id = data.get('photo_id')
     
     if photo_id not in photo_messages:
@@ -386,12 +352,10 @@ async def handle_photo_opened(sid, data):
     
     photo_info = photo_messages[photo_id]
     
-    # Mark as opened and start timer if not already started
     if not photo_info['timer_started']:
         photo_info['opened'] = True
         photo_info['timer_started'] = True
         
-        # Notify both users that timer has started
         sender_sid = photo_info['sender_sid']
         receiver_sid = photo_info['receiver_sid']
         
@@ -405,14 +369,12 @@ async def handle_photo_opened(sid, data):
             'duration': 15
         }, room=receiver_sid)
         
-        # Schedule deletion after 15 seconds
         asyncio.create_task(delete_photo_after_delay(photo_id, 15))
 
 @sio.on('skip_chat')
 async def handle_skip_chat(sid, data):
     print(f'[SKIP] User {sid} clicked skip', flush=True)
     
-    # Notify partner that user skipped (same as disconnect for partner)
     if sid in user_rooms:
         room_id = user_rooms[sid]
         
@@ -420,10 +382,8 @@ async def handle_skip_chat(sid, data):
             partner_sid = [s for s in active_chats[room_id] if s != sid]
             
             if partner_sid:
-                print(f'[SKIP] Notifying partner {partner_sid[0]} that user skipped', flush=True)
                 await sio.emit('partner_disconnected', room=partner_sid[0])
             
-            # Clean up partner's room reference
             if partner_sid and partner_sid[0] in user_rooms:
                 del user_rooms[partner_sid[0]]
             
@@ -433,7 +393,6 @@ async def handle_skip_chat(sid, data):
     
     await sio.emit('chat_ended', room=sid)
     
-    # Rejoin queue immediately for the user who skipped
     if sid in active_connections:
         city = active_connections[sid]['city']
         print(f'[SKIP] User {sid} rejoining queue for {city}', flush=True)
@@ -452,7 +411,6 @@ async def handle_disconnect_chat(sid, data=None):
             if notify and partner_sid:
                 await sio.emit('partner_disconnected', room=partner_sid[0])
             
-            # Clean up partner's room reference
             if partner_sid and partner_sid[0] in user_rooms:
                 del user_rooms[partner_sid[0]]
             
@@ -464,7 +422,6 @@ async def handle_disconnect_chat(sid, data=None):
 
 @sio.on('leave_queue')
 async def handle_leave_queue(sid, data=None):
-    """Remove user from waiting queue — called when frontend search times out."""
     for city, users in list(waiting_queue.items()):
         if sid in users:
             users.remove(sid)
@@ -504,7 +461,6 @@ async def handle_get_random_topic(sid, data):
 
 @sio.on('report_user')
 async def handle_report_user(sid, data):
-    """Handle user report with chat history"""
     if sid not in user_rooms:
         return
     
@@ -515,7 +471,6 @@ async def handle_report_user(sid, data):
     if room_id not in active_chats:
         return
     
-    # Get reported user's SID and IP
     partner_sid = [s for s in active_chats[room_id] if s != sid]
     if not partner_sid:
         return
@@ -524,7 +479,6 @@ async def handle_report_user(sid, data):
     reported_ip = user_ip_map.get(reported_sid, 'unknown')
     reporter_ip = user_ip_map.get(sid, 'unknown')
     
-    # Create report record
     report = {
         'id': str(uuid.uuid4()),
         'reported_sid': reported_sid,
@@ -538,31 +492,25 @@ async def handle_report_user(sid, data):
     }
     reports.append(report)
     
-    # Track reports per IP
     if reported_ip != 'unknown':
         ip_report_count[reported_ip] = ip_report_count.get(reported_ip, 0) + 1
         
-        # Check if user should be blocked (3+ reports)
         if ip_report_count[reported_ip] >= 3:
-            # Block for 3 days
             block_until = datetime.now(timezone.utc) + timedelta(days=3)
             ip_blocks[reported_ip] = block_until
             
             print(f'[REPORT] IP {reported_ip} blocked until {block_until}', flush=True)
             logger.info(f'IP {reported_ip} blocked for 3 days due to multiple reports')
             
-            # Notify and disconnect the reported user
             await sio.emit('blocked', {
                 'message': 'You have been blocked due to multiple reports.'
             }, room=reported_sid)
             
-            # Disconnect them
             await sio.disconnect(reported_sid)
     
     print(f'[REPORT] User {reported_sid} reported by {sid}. IP: {reported_ip}, Total reports: {ip_report_count.get(reported_ip, 1)}', flush=True)
     logger.info(f'User reported: {reported_sid} (IP: {reported_ip})')
     
-    # Notify reporter
     await sio.emit('report_submitted', {
         'success': True,
         'message': 'Report submitted successfully.'
@@ -571,29 +519,20 @@ async def handle_report_user(sid, data):
 # Helper functions
 async def try_match(city: str):
     print(f'[MATCH] try_match called for city: {city}', flush=True)
-    print(f'[MATCH] Current queue for {city}: {waiting_queue.get(city, [])}', flush=True)
     
     if city not in waiting_queue or len(waiting_queue[city]) < 2:
-        print(f'[MATCH] Not enough users in {city} (need 2, have {len(waiting_queue.get(city, []))})', flush=True)
-        # If less than 2 users in this city, try to match with any available user from other cities
         if city in waiting_queue and len(waiting_queue[city]) == 1:
-            # Find a user from any other city who's also waiting alone
             for other_city, other_users in waiting_queue.items():
                 if other_city != city and len(other_users) >= 1:
                     user1_sid = waiting_queue[city][0]
                     user2_sid = other_users[0]
                     
-                    # CRITICAL: Prevent self-matching
                     if user1_sid == user2_sid:
-                        print(f'[MATCH] ERROR: Attempted self-match prevented! {user1_sid}', flush=True)
                         continue
                     
-                    print(f'[MATCH] Found cross-city match: {city} + {other_city}', flush=True)
-                    # Match across cities
                     waiting_queue[city].pop(0)
                     other_users.pop(0)
                     
-                    # Clean up empty queues
                     if not waiting_queue[city]:
                         del waiting_queue[city]
                     if not other_users and other_city in waiting_queue:
@@ -603,50 +542,35 @@ async def try_match(city: str):
                     return
         return
     
-    # Get two users from same city
-    print(f'[MATCH] Matching two users from {city}', flush=True)
     user1_sid = waiting_queue[city][0]
     user2_sid = waiting_queue[city][1]
     
-    # CRITICAL: Prevent self-matching
     if user1_sid == user2_sid:
-        print(f'[MATCH] CRITICAL ERROR: Same user in queue twice! {user1_sid}', flush=True)
-        # Remove duplicate
         waiting_queue[city].pop(0)
         return
     
-    # Pop both users
     waiting_queue[city].pop(0)
     waiting_queue[city].pop(0)
     
-    print(f'[MATCH] Popped users: {user1_sid} and {user2_sid}', flush=True)
-    
-    # Clean up empty queue
     if not waiting_queue[city]:
         del waiting_queue[city]
     
     await create_match(user1_sid, user2_sid)
 
 async def create_match(user1_sid: str, user2_sid: str):
-    """Create a match between two users"""
     print(f'[MATCH] Creating match between {user1_sid} and {user2_sid}', flush=True)
     
-    # Prevent self-matching
     if user1_sid == user2_sid:
-        print('[MATCH] ERROR: Cannot match user with themselves!', flush=True)
         return
     
-    # Create room
     room_id = str(uuid.uuid4())
     active_chats[room_id] = [user1_sid, user2_sid]
     user_rooms[user1_sid] = room_id
     user_rooms[user2_sid] = room_id
     
-    # Get user data
     user1_data = active_connections.get(user1_sid, {})
     user2_data = active_connections.get(user2_sid, {})
     
-    # Notify both users
     await sio.emit('match_found', {
         'room_id': room_id,
         'partner': {
@@ -663,22 +587,16 @@ async def create_match(user1_sid: str, user2_sid: str):
         }
     }, room=user2_sid)
     
-    print(f'[MATCH] Matched {user1_sid} ({user1_data.get("city", "Unknown")}) and {user2_sid} ({user2_data.get("city", "Unknown")}) in room {room_id}', flush=True)
-    logger.info(f'Matched {user1_sid} ({user1_data.get("city", "Unknown")}) and {user2_sid} ({user2_data.get("city", "Unknown")}) in room {room_id}')
+    print(f'[MATCH] Matched {user1_sid} and {user2_sid} in room {room_id}', flush=True)
 
 async def try_global_match_after_delay(sid: str, delay: int):
-    """Try to match user with anyone globally after a delay"""
     await asyncio.sleep(delay)
     
-    # Check if user is still waiting
-    if sid not in user_rooms:  # Not matched yet
-        # Find any other waiting user from any city
+    if sid not in user_rooms:
         for city, users in list(waiting_queue.items()):
             if sid in users:
-                # User is still waiting, try to match with anyone
                 for other_city, other_users in list(waiting_queue.items()):
                     if other_users and (other_city != city or len(other_users) > 1):
-                        # Found someone, match them
                         if sid in waiting_queue.get(city, []):
                             waiting_queue[city].remove(sid)
                             if not waiting_queue[city]:
@@ -691,11 +609,9 @@ async def try_global_match_after_delay(sid: str, delay: int):
                                 del waiting_queue[other_city]
                             
                             await create_match(sid, other_sid)
-                            logger.info(f'Global match: {sid} with {other_sid}')
                             return
 
 async def delete_photo_after_delay(photo_id: str, delay: int):
-    """Delete photo after delay and notify both users"""
     await asyncio.sleep(delay)
     
     if photo_id in photo_messages:
@@ -703,16 +619,9 @@ async def delete_photo_after_delay(photo_id: str, delay: int):
         sender_sid = photo_info['sender_sid']
         receiver_sid = photo_info['receiver_sid']
         
-        # Notify both users that photo has been deleted
-        await sio.emit('photo_deleted', {
-            'photo_id': photo_id
-        }, room=sender_sid)
+        await sio.emit('photo_deleted', {'photo_id': photo_id}, room=sender_sid)
+        await sio.emit('photo_deleted', {'photo_id': photo_id}, room=receiver_sid)
         
-        await sio.emit('photo_deleted', {
-            'photo_id': photo_id
-        }, room=receiver_sid)
-        
-        # Clean up
         del photo_messages[photo_id]
         
     logger.info(f'Photo {photo_id} expired and deleted')
@@ -727,7 +636,6 @@ async def broadcast_stats():
     await sio.emit('stats_update', stats)
 
 # Combine FastAPI and Socket.IO
-# Socket.IO will handle requests to /api/socket.io/*
 socket_app = socketio.ASGIApp(
     sio,
     other_asgi_app=app,
