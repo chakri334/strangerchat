@@ -15,6 +15,7 @@ import random
 import logging
 import uuid as _uuid
 import base64 as _b64
+import aiohttp
 from datetime import datetime, timezone, timedelta
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -50,6 +51,32 @@ sid_to_tg: dict[str, int]  = {}  # sid     → chat_id
 
 BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 EMOJIS    = ['😊', '😎', '🤗', '😺', '🦊', '🐼', '🦄', '🌟']
+
+# ── PostHog server-side analytics ────────────────────────────────────────────
+POSTHOG_KEY = 'phc_xAvL2Iq4tFmANRE7kzbKwaSqp1HJjN7x48s3vr0CMjs'
+POSTHOG_URL = 'https://us.i.posthog.com/capture/'
+
+async def track(chat_id: int, event: str, properties: dict = {}):
+    """Send a server-side event to PostHog."""
+    payload = {
+        'api_key':     POSTHOG_KEY,
+        'event':       event,
+        'distinct_id': f'tg_{chat_id}',
+        'properties':  {
+            'source':   'telegram',
+            'platform': 'telegram',
+            **properties,
+        }
+    }
+    try:
+        async with aiohttp.ClientSession() as session:
+            await session.post(
+                POSTHOG_URL,
+                json=payload,
+                timeout=aiohttp.ClientTimeout(total=3),
+            )
+    except Exception as e:
+        logger.warning(f"[ANALYTICS] PostHog track failed: {e}")
 
 # Global application reference (set in create_bot_app)
 application: Application = None  # type: ignore
@@ -117,6 +144,7 @@ async def _handle_tg_event(chat_id: int, sid: str, event: str, data: dict):
         partner = data.get('partner', {})
         name    = partner.get('name', 'Stranger')
         emoji   = partner.get('emoji', '😊')
+        await track(chat_id, 'match_found')
         keyboard = InlineKeyboardMarkup([[
             InlineKeyboardButton("⏭ Skip",       callback_data="skip"),
             InlineKeyboardButton("🚫 Stop",       callback_data="disconnect"),
@@ -139,6 +167,7 @@ async def _handle_tg_event(chat_id: int, sid: str, event: str, data: dict):
         sender       = data.get('sender') or partner_data  # TG→TG includes sender
         name         = sender.get('name', 'Stranger')
         emoji        = sender.get('emoji', '💬')
+        await track(chat_id, 'message_received')
         await tg_send(chat_id, f"{emoji} <b>{name}:</b> {msg}")
 
     # ── Partner sent a photo ──────────────────────────────────────────────────
@@ -296,6 +325,7 @@ async def _join_queue(chat_id: int):
         return
 
     waiting_queue.setdefault('Global', []).append(sid)
+    await track(chat_id, 'join_queue')
     await tg_send(chat_id, "⏳ <b>Searching for a stranger...</b>")
 
     await try_match('Global')
@@ -314,6 +344,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await tg_send(chat_id, "ℹ️ Your previous chat was ended.")
 
     await _register_tg_user(chat_id, name)
+    await track(chat_id, 'session_start')
 
     keyboard = InlineKeyboardMarkup([[
         InlineKeyboardButton("🔍 Find a Stranger", callback_data="connect"),
@@ -351,6 +382,7 @@ async def cmd_skip(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     sid = user['sid']
+    await track(chat_id, 'skip_chat')
 
     # Notify partner and clean up current room
     if sid in user_rooms:
@@ -359,7 +391,7 @@ async def cmd_skip(update: Update, context: ContextTypes.DEFAULT_TYPE):
             partners = [s for s in active_chats[room_id] if s != sid]
             for p in partners:
                 user_rooms.pop(p, None)
-                asyncio.create_task(_original_emit('partner_disconnected', room=p))
+                asyncio.create_task(sio.emit('partner_disconnected', room=p))
             del active_chats[room_id]
 
     await _join_queue(chat_id)
@@ -381,6 +413,7 @@ async def cmd_stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     saved_name = user['name']
+    await track(chat_id, 'disconnect_chat')
     _full_cleanup(sid)
     # Re-register so /connect works immediately without /start
     await _register_tg_user(chat_id, saved_name)
@@ -442,6 +475,7 @@ async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except Exception:
                 pass
 
+    await track(chat_id, 'report_user')
     await tg_send(chat_id, "✅ <b>Report submitted.</b> Thank you for keeping Stumble Chat safe.")
     await cmd_skip(update, context)
 
@@ -511,6 +545,7 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     }
 
     # Confirm to TG sender (mirrors web 'photo_sent' event)
+    await track(chat_id, 'photo_sent')
     await tg_send(chat_id, "📷 Photo sent! ⏱ Disappears 15s after your partner views it.")
 
     # Deliver to partner via patched_emit (handles web and TG partners)
@@ -553,7 +588,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     user_data = active_connections.get(sid, {})
-    await _original_emit('new_message', {
+    await track(chat_id, 'message_sent')
+    await sio.emit('new_message', {
         'message':   text,
         'timestamp': datetime.now(timezone.utc).isoformat(),
         'from':      'partner',
