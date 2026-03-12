@@ -49,7 +49,15 @@ from server import (
 tg_users:  dict[int, dict] = {}  # chat_id → {sid, name}
 sid_to_tg: dict[str, int]  = {}  # sid     → chat_id
 
-BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+# Re-engagement registry — persists across sessions in memory
+# chat_id → {last_seen: datetime, last_notified: datetime | None, name: str}
+user_registry: dict[int, dict] = {}
+
+BOT_TOKEN    = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+BOT_USERNAME = os.environ.get("BOT_USERNAME", "StumbleChatBot")  # set in Emergent env vars
+
+# Cached file_id of the promo sticker — populated on first startup
+_PROMO_STICKER_FILE_ID: str = ""
 EMOJIS    = ['😊', '😎', '🤗', '😺', '🦊', '🐼', '🦄', '🌟']
 
 # ── PostHog server-side analytics ────────────────────────────────────────────
@@ -87,6 +95,188 @@ application: Application = None  # type: ignore
 def tg_sid(chat_id: int) -> str:
     return f"tg_{chat_id}"
 
+
+def touch_user(chat_id: int, name: str = "Stranger"):
+    """Update last_seen for a user. Call on every user interaction."""
+    now = datetime.now(timezone.utc)
+    if chat_id not in user_registry:
+        user_registry[chat_id] = {
+            'name':            name,
+            'last_seen':       now,
+            'last_notified':   None,
+            'joined_at':       now,
+            'chat_count':      0,       # total chats completed
+            'last_sticker_date': None,  # date of last promo sticker sent
+        }
+    else:
+        user_registry[chat_id]['last_seen'] = now
+        if name and name != "Stranger":
+            user_registry[chat_id]['name'] = name
+
+
+
+STICKER_PNG_PATH = os.path.join(os.path.dirname(__file__), "stumble_sticker.png")
+
+STICKER_SET_NAME = ""   # populated on startup
+def _generate_sticker_png(bot_username: str, path: str):
+    """Generate the promo sticker PNG with the real bot username."""
+    from PIL import Image, ImageDraw, ImageFont
+
+    SIZE = 512
+    img  = Image.new('RGBA', (SIZE, SIZE), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+
+    def rr(d, xy, r, fill):
+        x1,y1,x2,y2 = xy
+        if x2-x1 < 2*r: r = (x2-x1)//2
+        if y2-y1 < 2*r: r = (y2-y1)//2
+        d.rectangle([x1+r,y1,x2-r,y2], fill=fill)
+        d.rectangle([x1,y1+r,x2,y2-r], fill=fill)
+        for cx,cy in [(x1,y1),(x2-2*r,y1),(x1,y2-2*r),(x2-2*r,y2-2*r)]:
+            d.ellipse([cx,cy,cx+2*r,cy+2*r], fill=fill)
+
+    rr(draw, [0,0,512,512], 52, (250,249,255,255))
+
+    for x in range(512):
+        t = x/511
+        r = int(124+(252-124)*t)
+        g = 92
+        b = int(252+(125-252)*t)
+        draw.rectangle([x,4,x+1,12], fill=(r,g,b,255))
+
+    px1,py1,px2,py2 = 172,48,340,310
+    rr(draw, [px1,py1,px2,py2], 30, (20,16,40,255))
+    rr(draw, [px1+10,py1+26,px2-10,py2-20], 18, (242,240,255,255))
+    draw.ellipse([244,56,268,68], fill=(36,30,60,255))
+    rr(draw, [228,298,284,305], 4, (50,44,80,255))
+
+    rr(draw, [185,102,298,138], 14, (124,92,252,255))
+    draw.polygon([(196,136),(180,158),(218,136)], fill=(124,92,252,255))
+    rr(draw, [208,162,327,198], 14, (252,92,125,255))
+    draw.polygon([(316,196),(332,216),(296,196)], fill=(252,92,125,255))
+    rr(draw, [185,224,282,256], 14, (124,92,252,255))
+    draw.polygon([(196,254),(180,272),(218,254)], fill=(124,92,252,255))
+
+    try:
+        f17 = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 17)
+        f14 = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 14)
+        f56 = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 56)
+        f18 = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 18)
+    except:
+        f17=f14=f56=f18 = ImageFont.load_default()
+
+    draw.text((241,120), "Hey! 👋", font=f17, fill=(255,255,255,255), anchor="mm")
+    draw.text((267,180), "hi stranger 😊", font=f14, fill=(255,255,255,255), anchor="mm")
+    draw.text((233,240), "asl? 🌍", font=f17, fill=(255,255,255,255), anchor="mm")
+
+    draw.text((256,348), "Stumble", font=f56, fill=(20,16,40,255), anchor="mm")
+    draw.text((256,408), "Chat.", font=f56, fill=(252,92,125,255), anchor="mm")
+    draw.rectangle([142,430,370,438], fill=(124,92,252,60))
+    draw.rectangle([142,430,370,433], fill=(124,92,252,255))
+
+    draw.text((256,468), f"@{bot_username}  ·  stumblechat.online", font=f18, fill=(150,140,180,255), anchor="mm")
+
+    img.save(path)
+    logger.info(f"[Sticker] PNG generated at {path}")
+
+
+async def _load_promo_sticker():
+    """
+    Create a shareable sticker set on startup (if not exists), cache file_id.
+    Users who receive the sticker can tap it → Add Sticker → share it.
+    """
+    global _PROMO_STICKER_FILE_ID, STICKER_SET_NAME
+
+    if _PROMO_STICKER_FILE_ID:
+        return
+
+    # Always regenerate so bot handle is up to date
+    bot_info = await bot.get_me()
+    _generate_sticker_png(bot_info.username, STICKER_PNG_PATH)
+
+    admin_chat_id = int(os.environ.get("ADMIN_CHAT_ID", "0"))
+    if not admin_chat_id:
+        logger.warning("[Sticker] ADMIN_CHAT_ID not set — cannot create sticker set")
+        return
+
+    bot       = application.bot
+    set_name  = f"stumble_by_{bot_info.username}"
+    STICKER_SET_NAME = set_name
+
+    # Try to get existing set first
+    try:
+        sticker_set = await bot.get_sticker_set(set_name)
+        _PROMO_STICKER_FILE_ID = sticker_set.stickers[0].file_id
+        logger.info(f"[Sticker] Existing sticker set found — file_id cached")
+        return
+    except Exception:
+        pass  # set doesn't exist yet, create it
+
+    # Create new sticker set
+    try:
+        from telegram import InputSticker
+        with open(STICKER_PNG_PATH, "rb") as f:
+            png_bytes = f.read()
+
+        success = await bot.create_new_sticker_set(
+            user_id=admin_chat_id,
+            name=set_name,
+            title="Stumble Chat",
+            stickers=[
+                InputSticker(
+                    sticker=png_bytes,
+                    emoji_list=["💬"],
+                    format="static",
+                )
+            ],
+        )
+
+        if success:
+            sticker_set = await bot.get_sticker_set(set_name)
+            _PROMO_STICKER_FILE_ID = sticker_set.stickers[0].file_id
+            logger.info(f"[Sticker] Sticker set created: t.me/addstickers/{set_name}")
+        else:
+            logger.error("[Sticker] create_new_sticker_set returned False")
+
+    except Exception as e:
+        logger.error(f"[Sticker] Failed to create sticker set: {e}")
+
+
+async def _maybe_send_promo_sticker(chat_id: int):
+    """
+    Send the promo sticker if:
+    - This is the user's first ever completed chat, OR
+    - This is the user's first completed chat today
+    """
+    if not _PROMO_STICKER_FILE_ID:
+        return
+
+    info = user_registry.get(chat_id)
+    if not info:
+        return
+
+    today = datetime.now(timezone.utc).date()
+    last_sticker_date = info.get("last_sticker_date")
+    chat_count        = info.get("chat_count", 0)
+
+    should_send = (chat_count == 1) or (last_sticker_date != today)
+    if not should_send:
+        return
+
+    try:
+        await application.bot.send_sticker(chat_id=chat_id, sticker=_PROMO_STICKER_FILE_ID)
+        sticker_link = f"t.me/addstickers/{STICKER_SET_NAME}" if STICKER_SET_NAME else ""
+        add_sticker_line = f"\n🎭 <a href=\"https://{sticker_link}\">Add this sticker</a> to your collection" if sticker_link else ""
+        await tg_send(
+            chat_id,
+            "💜 <b>Enjoying Stumble Chat?</b>\n"
+            f"Share the bot with friends → @{BOT_USERNAME}"
+            f"{add_sticker_line}\n"
+            "🌐 stumblechat.online",
+        )
+        user_registry[chat_id]["last_sticker_date"] = today
+    except Exception as e:
+        logger.error(f"[Sticker] Failed to send promo sticker to {chat_id}: {e}")
 
 async def tg_send(chat_id: int, text: str, reply_markup=None):
     """Send a Telegram message safely."""
@@ -207,6 +397,9 @@ async def _handle_tg_event(chat_id: int, sid: str, event: str, data: dict):
 
     # ── Partner disconnected ──────────────────────────────────────────────────
     elif event == 'partner_disconnected':
+        # Increment chat count
+        if chat_id in user_registry:
+            user_registry[chat_id]["chat_count"] = user_registry[chat_id].get("chat_count", 0) + 1
         keyboard = InlineKeyboardMarkup([[
             InlineKeyboardButton("🔍 Find new stranger", callback_data="connect"),
         ]])
@@ -216,14 +409,19 @@ async def _handle_tg_event(chat_id: int, sid: str, event: str, data: dict):
             reply_markup=keyboard,
         )
         _remove_from_chat(sid)
+        await _maybe_send_promo_sticker(chat_id)
 
     # ── Chat ended (skipped by partner) ──────────────────────────────────────
     elif event == 'chat_ended':
+        # Increment chat count
+        if chat_id in user_registry:
+            user_registry[chat_id]["chat_count"] = user_registry[chat_id].get("chat_count", 0) + 1
         keyboard = InlineKeyboardMarkup([[
             InlineKeyboardButton("🔍 Find new stranger", callback_data="connect"),
         ]])
         await tg_send(chat_id, "Chat ended. /connect to find someone new.", reply_markup=keyboard)
         _remove_from_chat(sid)
+        await _maybe_send_promo_sticker(chat_id)
 
     # ── Error (includes block notification) ──────────────────────────────────
     elif event == 'error':
@@ -345,6 +543,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await _register_tg_user(chat_id, name)
     await track(chat_id, 'session_start')
+    touch_user(chat_id, name)
 
     keyboard = InlineKeyboardMarkup([[
         InlineKeyboardButton("🔍 Find a Stranger", callback_data="connect"),
@@ -369,8 +568,10 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def cmd_connect(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
+    name    = update.effective_user.first_name or "Stranger"
     if chat_id not in tg_users:
-        await _register_tg_user(chat_id, update.effective_user.first_name or "Stranger")
+        await _register_tg_user(chat_id, name)
+    touch_user(chat_id, name)
     await _join_queue(chat_id)
 
 
@@ -508,6 +709,7 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await tg_send(chat_id, "Send /start to begin using Stumble Chat.")
         return
 
+    touch_user(chat_id)
     sid = user['sid']
     if sid not in user_rooms:
         await tg_send(chat_id, "You're not connected to anyone. /connect first.")
@@ -572,6 +774,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await tg_send(chat_id, "Send /start to begin using Stumble Chat.")
         return
 
+    touch_user(chat_id)
     sid = user['sid']
 
     if sid not in user_rooms:
@@ -600,6 +803,49 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     }, room=partners[0])
 
 
+
+async def handle_sticker(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Forward stickers to the matched partner."""
+    chat_id = update.effective_chat.id
+    user    = tg_users.get(chat_id)
+    if not user:
+        await tg_send(chat_id, "Send /start to begin using Stumble Chat.")
+        return
+
+    touch_user(chat_id)
+    sid = user['sid']
+    if sid not in user_rooms:
+        await tg_send(chat_id, "You're not connected to anyone. /connect first.")
+        return
+
+    room_id  = user_rooms[sid]
+    partners = [s for s in active_chats.get(room_id, []) if s != sid]
+    if not partners:
+        await tg_send(chat_id, "No partner found. Try /skip.")
+        return
+
+    partner_sid = partners[0]
+    sticker     = update.message.sticker
+    file_id     = sticker.file_id
+
+    # TG → TG: forward the sticker directly by file_id (no re-upload needed)
+    partner_chat_id = sid_to_tg.get(partner_sid)
+    if partner_chat_id:
+        try:
+            await application.bot.send_sticker(chat_id=partner_chat_id, sticker=file_id)
+        except Exception as e:
+            logger.error(f"[TG] Failed to forward sticker: {e}")
+    else:
+        # TG → Web: web users can't receive stickers natively,
+        # so send the sticker's emoji as a text message fallback
+        emoji = sticker.emoji or "🙂"
+        await sio.emit('new_message', {
+            'message':   emoji,
+            'sender':    'stranger',
+            'timestamp': datetime.now(timezone.utc).isoformat(),
+        }, room=partner_sid)
+
+
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle inline keyboard button presses."""
     query   = update.callback_query
@@ -620,6 +866,82 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ── App setup ─────────────────────────────────────────────────────────────────
 
+
+# ── Re-engagement Notifier ────────────────────────────────────────────────────
+
+async def _reengagement_loop():
+    """
+    Every hour: check for users inactive 3+ days.
+    If the queue has someone waiting, notify each eligible user once every 2 days.
+    """
+    INACTIVE_THRESHOLD  = timedelta(days=3)
+    NOTIFY_COOLDOWN     = timedelta(days=2)
+    CHECK_INTERVAL_SECS = 3600  # run every hour
+
+    await asyncio.sleep(60)  # small startup delay
+    logger.info("[Reengagement] Loop started")
+
+    while True:
+        try:
+            # Only notify if there is actually someone in the queue
+            queue_has_users = any(len(v) > 0 for v in waiting_queue.values())
+
+            if queue_has_users:
+                now      = datetime.now(timezone.utc)
+                notified = 0
+
+                for chat_id, info in list(user_registry.items()):
+                    last_seen     = info.get("last_seen")
+                    last_notified = info.get("last_notified")
+
+                    if not last_seen:
+                        continue
+
+                    # Must be inactive 3+ days
+                    if (now - last_seen) < INACTIVE_THRESHOLD:
+                        continue
+
+                    # Must not have been notified in last 2 days
+                    if last_notified and (now - last_notified) < NOTIFY_COOLDOWN:
+                        continue
+
+                    # Skip users currently chatting or in queue
+                    sid = tg_sid(chat_id)
+                    if sid in user_rooms:
+                        continue
+                    if any(sid in users for users in waiting_queue.values()):
+                        continue
+
+                    total_waiting = sum(len(v) for v in waiting_queue.values())
+                    name = info.get("name", "there")
+
+                    try:
+                        keyboard = InlineKeyboardMarkup([[
+                            InlineKeyboardButton("Find a Stranger", callback_data="connect"),
+                        ]])
+                        await tg_send(
+                            chat_id,
+                            f"Hey {name}! Someone is waiting to chat right now.\n\n"
+                            f"{'👥 ' + str(total_waiting) + ' people' if total_waiting > 1 else '👤 1 person'} "
+                            f"in the queue — you could match instantly.\n\n"
+                            f"Tap below or send /connect to start.",
+                            reply_markup=keyboard,
+                        )
+                        user_registry[chat_id]["last_notified"] = now
+                        notified += 1
+                        await asyncio.sleep(0.05)  # respect Telegram rate limit
+                    except Exception as e:
+                        logger.warning(f"[Reengagement] Failed to notify {chat_id}: {e}")
+
+                if notified:
+                    logger.info(f"[Reengagement] Notified {notified} inactive users")
+
+        except Exception as e:
+            logger.error(f"[Reengagement] Loop error: {e}")
+
+        await asyncio.sleep(CHECK_INTERVAL_SECS)
+
+
 def create_bot_app() -> Application:
     global application
     application = Application.builder().token(BOT_TOKEN).build()
@@ -631,8 +953,15 @@ def create_bot_app() -> Application:
     application.add_handler(CommandHandler("report",  cmd_report))
     application.add_handler(CommandHandler("help",    cmd_help))
     application.add_handler(MessageHandler(filters.PHOTO, handle_photo))
+    application.add_handler(MessageHandler(filters.Sticker.ALL, handle_sticker))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     application.add_handler(CallbackQueryHandler(handle_callback))
+
+    # Start re-engagement notifier as background task
+    asyncio.get_event_loop().create_task(_reengagement_loop())
+
+    # Upload promo sticker on startup
+    asyncio.get_event_loop().create_task(_load_promo_sticker())
 
     return application
 
