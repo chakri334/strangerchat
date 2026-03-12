@@ -689,12 +689,27 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/skip    – Skip to next stranger\n"
         "/stop    – Disconnect\n"
         "/report  – Report current partner\n"
+        "/sticker – Get our sticker to share\n"
         "/help    – Show this message\n\n"
         "💬 Type normally to send messages when connected.\n"
         "📷 Send photos directly in this chat when connected.\n\n"
         "🌐 https://stumblechat.online\n"
         "📧 stumblechat.online@gmail.com",
     )
+
+
+async def cmd_sticker(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Send the promo sticker + shareable sticker pack link."""
+    chat_id = update.effective_chat.id
+    if not _PROMO_STICKER_FILE_ID:
+        await tg_send(chat_id, "⚙️ Sticker is still loading, try again in a few seconds.")
+        return
+    await application.bot.send_sticker(chat_id=chat_id, sticker=_PROMO_STICKER_FILE_ID)
+    pack_link = f"https://t.me/addstickers/{STICKER_SET_NAME}" if STICKER_SET_NAME else ""
+    msg = "💜 <b>Stumble Chat sticker!</b>\n\nShare it with friends to spread the word."
+    if pack_link:
+        msg += f'\n\n🎭 <a href="{pack_link}">Add full sticker pack</a>'
+    await tg_send(chat_id, msg)
 
 
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -952,6 +967,7 @@ def create_bot_app() -> Application:
     application.add_handler(CommandHandler("stop",    cmd_stop))
     application.add_handler(CommandHandler("report",  cmd_report))
     application.add_handler(CommandHandler("help",    cmd_help))
+    application.add_handler(CommandHandler("sticker",  cmd_sticker))
     application.add_handler(MessageHandler(filters.PHOTO, handle_photo))
     application.add_handler(MessageHandler(filters.Sticker.ALL, handle_sticker))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
