@@ -976,9 +976,6 @@ def create_bot_app() -> Application:
     # Start re-engagement notifier as background task
     asyncio.get_event_loop().create_task(_reengagement_loop())
 
-    # Upload promo sticker on startup
-    asyncio.get_event_loop().create_task(_load_promo_sticker())
-
     return application
 
 
@@ -989,6 +986,8 @@ async def run_bot():
     await app.start()
     await app.updater.start_polling(drop_pending_updates=True)
     logger.info("[TG] Bot is running.")
+    # Bot is fully ready — now safe to call application.bot
+    await _load_promo_sticker()
     await asyncio.Event().wait()
 
 
