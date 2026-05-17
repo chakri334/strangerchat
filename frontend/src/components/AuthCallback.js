@@ -47,6 +47,19 @@ const AuthCallback = () => {
           // Store user in localStorage for quick access
           localStorage.setItem('user', JSON.stringify(data.user));
           
+          // Set authSession so AuthOnboarding recognizes user is authenticated
+          const now = Date.now();
+          localStorage.setItem('authSession', JSON.stringify({
+            mode: 'google',
+            createdAt: now,
+            email: data.user.email,
+            name: data.user.name,
+            verified: true
+          }));
+          localStorage.setItem('authMethod', 'google');
+          if (data.user.email) localStorage.setItem('accountEmail', data.user.email);
+          if (data.user.name) localStorage.setItem('userName', data.user.name);
+          
           // Clear the URL fragment and redirect to home
           window.history.replaceState({}, document.title, '/');
           navigate('/', { replace: true, state: { user: data.user } });
