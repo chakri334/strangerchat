@@ -138,15 +138,13 @@ async def google_auth_start(request: Request):
     if not GOOGLE_CLIENT_ID:
         return {'ok': False, 'message': 'Google OAuth not configured'}
     
-    # Dynamically determine redirect URI based on request origin
-    # This allows testing on preview while production uses the configured URI
-    host = request.headers.get('host', '')
-    scheme = request.headers.get('x-forwarded-proto', 'https')
-    
-    # Use configured URI for production, dynamic for preview/dev
-    if 'stumblechat.online' in host:
-        redirect_uri = GOOGLE_REDIRECT_URI or f"{scheme}://{host}/api/auth/google/callback"
+    # Use configured GOOGLE_REDIRECT_URI if set (for production with custom domain)
+    # Otherwise, dynamically determine from request (for local/preview testing)
+    if GOOGLE_REDIRECT_URI:
+        redirect_uri = GOOGLE_REDIRECT_URI
     else:
+        host = request.headers.get('host', '')
+        scheme = request.headers.get('x-forwarded-proto', 'https')
         redirect_uri = f"{scheme}://{host}/api/auth/google/callback"
     
     # Generate CSRF state token
@@ -179,13 +177,12 @@ async def google_auth_start(request: Request):
 async def google_auth_callback(request: Request, code: Optional[str] = None, state: Optional[str] = None, error: Optional[str] = None):
     """Handle Google OAuth callback"""
     
-    # Dynamically determine redirect URI (must match what was used in /start)
-    host = request.headers.get('host', '')
-    scheme = request.headers.get('x-forwarded-proto', 'https')
-    
-    if 'stumblechat.online' in host:
-        redirect_uri = GOOGLE_REDIRECT_URI or f"{scheme}://{host}/api/auth/google/callback"
+    # Use configured GOOGLE_REDIRECT_URI if set (must match what was used in /start)
+    if GOOGLE_REDIRECT_URI:
+        redirect_uri = GOOGLE_REDIRECT_URI
     else:
+        host = request.headers.get('host', '')
+        scheme = request.headers.get('x-forwarded-proto', 'https')
         redirect_uri = f"{scheme}://{host}/api/auth/google/callback"
     
     # Handle errors from Google
