@@ -37,10 +37,12 @@ ip_blocks: Dict[str, datetime] = {}  # ip -> block_expires_at
 user_ip_map: Dict[str, str] = {}  # socket_id -> ip_address
 ip_report_count: Dict[str, int] = {}  # ip -> report_count
 
+# In-memory storage for user sessions (Emergent Google Auth)
+user_sessions: Dict[str, dict] = {}  # session_token -> {user_id, email, name, picture, expires_at}
+users_db: Dict[str, dict] = {}  # user_id -> {user_id, email, name, picture, created_at}
+
 # Photo tracking for disappearing photos
 photo_messages: Dict[str, dict] = {}  # photo_id -> {sender_sid, receiver_sid, opened, timer_started}
-google_auth_states: Dict[str, datetime] = {}
-google_users: Dict[str, dict] = {}
 
 # Socket.IO server — strong connection config for mobile users
 sio = socketio.AsyncServer(
@@ -120,50 +122,149 @@ async def health_check():
 async def root():
     return {'message': 'Chat server running'}
 
-@app.get('/api/auth/google/start')
-async def google_auth_start():
-    if not GOOGLE_CLIENT_ID or not GOOGLE_REDIRECT_URI:
-        return {'ok': False, 'message': 'Google auth is not configured'}
-    state = secrets.token_urlsafe(24)
-    google_auth_states[state] = datetime.now(timezone.utc)
-    query = urlencode({
-        'client_id': GOOGLE_CLIENT_ID,
-        'redirect_uri': GOOGLE_REDIRECT_URI,
-        'response_type': 'code',
-        'scope': 'openid email profile',
-        'state': state,
-        'prompt': 'select_account',
-        'access_type': 'offline'
-    })
-    return {'ok': True, 'auth_url': f'https://accounts.google.com/o/oauth2/v2/auth?{query}', 'state': state}
+# ============================================
+# EMERGENT GOOGLE AUTH ENDPOINTS
+# ============================================
 
-@app.get('/api/auth/google/callback')
-async def google_auth_callback(code: Optional[str] = None, state: Optional[str] = None):
-    if not code or not state or state not in google_auth_states:
-        return Response(content="<script>window.opener&&window.opener.postMessage({type:'google-auth-error',message:'Invalid callback'},'*');window.close();</script>", media_type="text/html")
-    del google_auth_states[state]
-    if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET or not GOOGLE_REDIRECT_URI:
-        return Response(content="<script>window.opener&&window.opener.postMessage({type:'google-auth-error',message:'Google auth misconfigured'},'*');window.close();</script>", media_type="text/html")
+@app.post('/api/auth/session')
+async def exchange_session(request: Request, response: Response):
+    """
+    Exchange Emergent session_id for user data and set session cookie.
+    REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
+    """
     try:
-        token_resp = requests.post('https://oauth2.googleapis.com/token', data={
-            'code': code,
-            'client_id': GOOGLE_CLIENT_ID,
-            'client_secret': GOOGLE_CLIENT_SECRET,
-            'redirect_uri': GOOGLE_REDIRECT_URI,
-            'grant_type': 'authorization_code'
-        }, timeout=8)
-        token_data = token_resp.json()
-        access_token = token_data.get('access_token')
-        if not access_token:
-            raise ValueError('Token exchange failed')
-        profile_resp = requests.get('https://www.googleapis.com/oauth2/v3/userinfo', headers={'Authorization': f'Bearer {access_token}'}, timeout=8)
-        profile = profile_resp.json()
-        email = (profile.get('email') or '').strip().lower()
-        google_users[email] = {'email': email, 'name': profile.get('name', ''), 'picture': profile.get('picture', '')}
-        payload = {'type': 'google-auth-success', 'session': {'mode': 'google', 'email': email, 'name': profile.get('name', ''), 'avatar': profile.get('picture', ''), 'verified': True}}
-        return Response(content=f"<script>window.opener&&window.opener.postMessage({payload},'*');window.close();</script>", media_type="text/html")
-    except Exception:
-        return Response(content="<script>window.opener&&window.opener.postMessage({type:'google-auth-error',message:'Google authentication failed'},'*');window.close();</script>", media_type="text/html")
+        body = await request.json()
+        session_id = body.get('session_id')
+        
+        if not session_id:
+            return {'ok': False, 'message': 'Missing session_id'}
+        
+        # Call Emergent Auth to get user data
+        auth_response = requests.get(
+            'https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data',
+            headers={'X-Session-ID': session_id},
+            timeout=10
+        )
+        
+        if auth_response.status_code != 200:
+            logger.error(f"Emergent auth failed: {auth_response.status_code}")
+            return {'ok': False, 'message': 'Authentication failed'}
+        
+        user_data = auth_response.json()
+        email = user_data.get('email', '').lower()
+        session_token = user_data.get('session_token')
+        
+        if not email or not session_token:
+            return {'ok': False, 'message': 'Invalid session data'}
+        
+        # Generate user_id if new user
+        user_id = f"user_{uuid.uuid4().hex[:12]}"
+        
+        # Check if user exists
+        existing_user = None
+        for uid, udata in users_db.items():
+            if udata.get('email') == email:
+                existing_user = udata
+                user_id = uid
+                break
+        
+        if not existing_user:
+            # Create new user
+            users_db[user_id] = {
+                'user_id': user_id,
+                'email': email,
+                'name': user_data.get('name', ''),
+                'picture': user_data.get('picture', ''),
+                'created_at': datetime.now(timezone.utc).isoformat()
+            }
+            logger.info(f"New user created: {email}")
+        else:
+            # Update existing user
+            users_db[user_id]['name'] = user_data.get('name', existing_user.get('name', ''))
+            users_db[user_id]['picture'] = user_data.get('picture', existing_user.get('picture', ''))
+        
+        # Store session with 7-day expiry
+        expires_at = datetime.now(timezone.utc) + timedelta(days=7)
+        user_sessions[session_token] = {
+            'user_id': user_id,
+            'email': email,
+            'name': user_data.get('name', ''),
+            'picture': user_data.get('picture', ''),
+            'expires_at': expires_at.isoformat()
+        }
+        
+        # Set httpOnly cookie
+        response.set_cookie(
+            key='session_token',
+            value=session_token,
+            httponly=True,
+            secure=True,
+            samesite='none',
+            path='/',
+            max_age=7 * 24 * 60 * 60  # 7 days
+        )
+        
+        return {
+            'ok': True,
+            'user': {
+                'user_id': user_id,
+                'email': email,
+                'name': user_data.get('name', ''),
+                'picture': user_data.get('picture', '')
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Session exchange error: {e}")
+        return {'ok': False, 'message': 'Authentication failed'}
+
+@app.get('/api/auth/me')
+async def get_current_user(request: Request):
+    """Get current authenticated user from session cookie or Authorization header"""
+    # Try cookie first
+    session_token = request.cookies.get('session_token')
+    
+    # Fallback to Authorization header
+    if not session_token:
+        auth_header = request.headers.get('Authorization', '')
+        if auth_header.startswith('Bearer '):
+            session_token = auth_header[7:]
+    
+    if not session_token or session_token not in user_sessions:
+        return Response(status_code=401, content='{"ok": false, "message": "Not authenticated"}', media_type='application/json')
+    
+    session = user_sessions[session_token]
+    
+    # Check expiry
+    expires_at = datetime.fromisoformat(session['expires_at'])
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    
+    if expires_at < datetime.now(timezone.utc):
+        del user_sessions[session_token]
+        return Response(status_code=401, content='{"ok": false, "message": "Session expired"}', media_type='application/json')
+    
+    return {
+        'ok': True,
+        'user': {
+            'user_id': session['user_id'],
+            'email': session['email'],
+            'name': session['name'],
+            'picture': session['picture']
+        }
+    }
+
+@app.post('/api/auth/logout')
+async def logout(request: Request, response: Response):
+    """Logout and clear session"""
+    session_token = request.cookies.get('session_token')
+    
+    if session_token and session_token in user_sessions:
+        del user_sessions[session_token]
+    
+    response.delete_cookie(key='session_token', path='/')
+    
+    return {'ok': True, 'message': 'Logged out successfully'}
 
 @app.get('/api/check-ip')
 async def check_ip_block(request: Request):
