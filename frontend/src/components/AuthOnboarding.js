@@ -1,23 +1,14 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Mail, ArrowRight, UserRound } from 'lucide-react';
 import { toast } from 'sonner';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const OTP_TTL_MS = 5 * 60 * 1000;
 
 const AuthOnboarding = ({ onAuthenticated }) => {
   const [email, setEmail] = useState('');
   const [otpStep, setOtpStep] = useState(false);
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
-
-  const otpMeta = useMemo(() => {
-    try {
-      return JSON.parse(localStorage.getItem('otpMeta') || '{}');
-    } catch {
-      return {};
-    }
-  }, [otpStep]);
 
   // Listen for messages from OAuth popup
   useEffect(() => {
@@ -113,31 +104,70 @@ const AuthOnboarding = ({ onAuthenticated }) => {
     }
   };
 
-  const handleSendOtp = () => {
+  const handleSendOtp = async () => {
     const normalized = email.trim().toLowerCase();
     if (!/^\S+@\S+\.\S+$/.test(normalized)) {
       toast.error('Enter a valid email');
       return;
     }
-    const code = String(Math.floor(100000 + Math.random() * 900000));
-    localStorage.setItem('otpMeta', JSON.stringify({ email: normalized, code, expiresAt: Date.now() + OTP_TTL_MS }));
-    setOtpStep(true);
-    toast.success('OTP sent (demo mode)');
+    setLoading(true);
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/auth/email/send-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: normalized }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        toast.error(data.message || 'Failed to send OTP');
+        return;
+      }
+      setOtpStep(true);
+      // DEV ONLY: show OTP for demo testing. Remove when email delivery is wired.
+      if (data.dev_code) {
+        toast.success(`OTP sent (demo): ${data.dev_code}`);
+      } else {
+        toast.success('OTP sent to your email');
+      }
+    } catch (e) {
+      console.error('send-otp error:', e);
+      toast.error('Network error');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleVerifyOtp = () => {
-    const meta = otpMeta || {};
-    if (!meta.code || !meta.expiresAt || Date.now() > meta.expiresAt) {
-      toast.error('OTP expired. Request a new one.');
+  const handleVerifyOtp = async () => {
+    const normalized = email.trim().toLowerCase();
+    const code = (otp || '').trim();
+    if (!/^\d{6}$/.test(code)) {
+      toast.error('Enter the 6-digit code');
       return;
     }
-    if ((otp || '').trim() !== String(meta.code)) {
-      toast.error('Invalid OTP');
-      return;
+    setLoading(true);
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/auth/email/verify-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: normalized, code }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        toast.error(data.message || 'Invalid code');
+        return;
+      }
+      const user = data.user;
+      localStorage.setItem('user', JSON.stringify(user));
+      if (user.session_token) localStorage.setItem('session_token', user.session_token);
+      if (user.name) localStorage.setItem('userName', user.name);
+      toast.success('Email verified');
+      finishSession('email', { email: user.email, name: user.name, verified: true });
+    } catch (e) {
+      console.error('verify-otp error:', e);
+      toast.error('Network error');
+    } finally {
+      setLoading(false);
     }
-    localStorage.removeItem('otpMeta');
-    finishSession('email', { email: meta.email, verified: true });
-    toast.success('Email verified');
   };
 
   const handleGuest = () => {
@@ -175,11 +205,11 @@ const AuthOnboarding = ({ onAuthenticated }) => {
               <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="Email address" className="w-full bg-black/40 border border-white/10 rounded-xl py-3 pl-10 pr-3 outline-none focus:ring-2 focus:ring-[#7c5cfc]" />
             </div>
             {!otpStep ? (
-              <button onClick={handleSendOtp} className="w-full py-3 rounded-2xl bg-gradient-to-r from-[#7c5cfc] to-[#fc5c7d] font-semibold flex items-center justify-center gap-2">Continue with Email <ArrowRight size={16} /></button>
+              <button onClick={handleSendOtp} disabled={loading} data-testid="email-send-otp-btn" className="w-full py-3 rounded-2xl bg-gradient-to-r from-[#7c5cfc] to-[#fc5c7d] font-semibold flex items-center justify-center gap-2 disabled:opacity-50">{loading ? 'Sending...' : (<>Continue with Email <ArrowRight size={16} /></>)}</button>
             ) : (
               <>
-                <input value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="Enter 6-digit OTP" className="w-full bg-black/40 border border-white/10 rounded-xl py-3 px-3 outline-none focus:ring-2 focus:ring-[#7c5cfc]" />
-                <button onClick={handleVerifyOtp} className="w-full py-3 rounded-2xl bg-gradient-to-r from-[#7c5cfc] to-[#fc5c7d] font-semibold">Verify OTP</button>
+                <input value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="Enter 6-digit OTP" data-testid="email-otp-input" className="w-full bg-black/40 border border-white/10 rounded-xl py-3 px-3 outline-none focus:ring-2 focus:ring-[#7c5cfc]" />
+                <button onClick={handleVerifyOtp} disabled={loading} data-testid="email-verify-otp-btn" className="w-full py-3 rounded-2xl bg-gradient-to-r from-[#7c5cfc] to-[#fc5c7d] font-semibold disabled:opacity-50">{loading ? 'Verifying...' : 'Verify OTP'}</button>
               </>
             )}
           </div>

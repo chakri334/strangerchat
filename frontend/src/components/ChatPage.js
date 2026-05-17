@@ -386,7 +386,7 @@ const ChatPage = ({ socket, partner, onClose, onSkip }) => {
           
           {messages.map((msg, idx) => (
             <div
-              key={idx}
+              key={msg.photo_id || msg.timestamp?.getTime() || idx}
               className={`flex ${msg.from === 'me' ? 'justify-end' : 'justify-start'}`}
               data-testid={`message-${msg.from}`}
             >

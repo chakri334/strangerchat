@@ -64,8 +64,10 @@ EMOJIS    = ['😊', '😎', '🤗', '😺', '🦊', '🐼', '🦄', '🌟']
 POSTHOG_KEY = 'phc_xAvL2Iq4tFmANRE7kzbKwaSqp1HJjN7x48s3vr0CMjs'
 POSTHOG_URL = 'https://us.i.posthog.com/capture/'
 
-async def track(chat_id: int, event: str, properties: dict = {}):
+async def track(chat_id: int, event: str, properties: dict = None):
     """Send a server-side event to PostHog."""
+    if properties is None:
+        properties = {}
     payload = {
         'api_key':     POSTHOG_KEY,
         'event':       event,
@@ -127,9 +129,11 @@ def _generate_sticker_png(bot_username: str, path: str):
     draw = ImageDraw.Draw(img)
 
     def rr(d, xy, r, fill):
-        x1,y1,x2,y2 = xy
-        if x2-x1 < 2*r: r = (x2-x1)//2
-        if y2-y1 < 2*r: r = (y2-y1)//2
+        x1, y1, x2, y2 = xy
+        if x2-x1 < 2*r:
+            r = (x2-x1)//2
+        if y2-y1 < 2*r:
+            r = (y2-y1)//2
         d.rectangle([x1+r,y1,x2-r,y2], fill=fill)
         d.rectangle([x1,y1+r,x2,y2-r], fill=fill)
         for cx,cy in [(x1,y1),(x2-2*r,y1),(x1,y2-2*r),(x2-2*r,y2-2*r)]:
@@ -162,8 +166,8 @@ def _generate_sticker_png(bot_username: str, path: str):
         f14 = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 14)
         f56 = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 56)
         f18 = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 18)
-    except:
-        f17=f14=f56=f18 = ImageFont.load_default()
+    except OSError:
+        f17 = f14 = f56 = f18 = ImageFont.load_default()
 
     draw.text((241,120), "Hey! 👋", font=f17, fill=(255,255,255,255), anchor="mm")
     draw.text((267,180), "hi stranger 😊", font=f14, fill=(255,255,255,255), anchor="mm")
@@ -190,6 +194,9 @@ async def _load_promo_sticker():
     if _PROMO_STICKER_FILE_ID:
         return
 
+    # Get bot instance first
+    bot = application.bot
+    
     # Always regenerate so bot handle is up to date
     bot_info = await bot.get_me()
     _generate_sticker_png(bot_info.username, STICKER_PNG_PATH)
@@ -199,7 +206,6 @@ async def _load_promo_sticker():
         logger.warning("[Sticker] ADMIN_CHAT_ID not set — cannot create sticker set")
         return
 
-    bot       = application.bot
     set_name  = f"stumble_by_{bot_info.username}"
     STICKER_SET_NAME = set_name
 

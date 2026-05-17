@@ -52,6 +52,7 @@ export const AuthProvider = ({ children }) => {
       }
     } catch (error) {
       // Keep localStorage user if backend is unreachable
+      console.warn('Auth check failed, using cached user:', error.message);
     } finally {
       setLoading(false);
     }
@@ -121,7 +122,8 @@ export const AuthProvider = ({ children }) => {
         });
       }
     } catch (error) {
-      // Ignore logout errors
+      // Log but don't block logout if server is unreachable
+      console.warn('Logout request failed:', error.message);
     } finally {
       setUser(null);
       localStorage.removeItem('user');

@@ -238,7 +238,7 @@ const ChatModal = ({ socket, partner, onClose, onPhotoView }) => {
           
           {messages.map((msg, idx) => (
             <div
-              key={idx}
+              key={msg.id || msg.timestamp?.getTime() || idx}
               className={`flex ${msg.from === 'me' ? 'justify-end' : 'justify-start'}`}
               data-testid={`message-${msg.from}`}
             >

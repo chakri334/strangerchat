@@ -13,8 +13,11 @@ import uuid
 import logging
 import time
 import secrets
+import hashlib
+import re
 import requests
 from urllib.parse import urlencode
+from db import users_collection, reports_collection, sessions_collection, otp_collection, init_indexes
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -77,6 +80,13 @@ from contextlib import asynccontextmanager
 
 @asynccontextmanager
 async def lifespan(app_instance):
+    # Initialize MongoDB indexes
+    try:
+        await init_indexes()
+        logger.info("MongoDB indexes initialized")
+    except Exception as e:
+        logger.error(f"Failed to initialize MongoDB indexes: {e}")
+
     bot_task = None
     telegram_token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
     if telegram_token and telegram_token != "your_bot_token_here":
@@ -294,33 +304,62 @@ async def google_auth_callback(request: Request, code: Optional[str] = None, sta
         if not email:
             raise Exception("No email in profile")
         
-        # Find or create user
-        user_id = None
-        for uid, udata in users_db.items():
-            if udata.get('email') == email:
-                user_id = uid
-                break
-        
-        if not user_id:
+        # Find or create user (upsert in MongoDB)
+        existing = await users_collection.find_one({'email': email}, {'_id': 0})
+
+        now_iso = datetime.now(timezone.utc).isoformat()
+
+        if existing:
+            user_id = existing['user_id']
+            await users_collection.update_one(
+                {'email': email},
+                {'$set': {
+                    'name': name,
+                    'picture': picture,
+                    'last_login_at': now_iso,
+                    'provider': 'google'
+                }}
+            )
+            logger.info(f"Existing user logged in: {email}")
+        else:
             user_id = f"user_{secrets.token_hex(6)}"
-            users_db[user_id] = {
+            await users_collection.insert_one({
                 'user_id': user_id,
                 'email': email,
                 'name': name,
                 'picture': picture,
-                'created_at': datetime.now(timezone.utc).isoformat()
-            }
-            logger.info(f"New StumbleChat user created: {email}")
-        else:
-            # Update existing user
-            users_db[user_id]['name'] = name
-            users_db[user_id]['picture'] = picture
-            logger.info(f"Existing user logged in: {email}")
-        
-        # Create session token
+                'provider': 'google',
+                'created_at': now_iso,
+                'last_login_at': now_iso
+            })
+            logger.info(f"New StumbleChat user created (google): {email}")
+
+        # Keep in-memory cache for quick access
+        users_db[user_id] = {
+            'user_id': user_id,
+            'email': email,
+            'name': name,
+            'picture': picture,
+            'provider': 'google',
+            'created_at': now_iso
+        }
+
+        # Create session token (persisted to MongoDB)
         session_token = secrets.token_urlsafe(32)
         expires_at = datetime.now(timezone.utc) + timedelta(days=7)
-        
+
+        session_doc = {
+            'session_token': session_token,
+            'user_id': user_id,
+            'email': email,
+            'name': name,
+            'picture': picture,
+            'expires_at': expires_at,
+            'created_at': datetime.now(timezone.utc)
+        }
+        await sessions_collection.insert_one(session_doc)
+
+        # In-memory cache for fast lookup
         user_sessions[session_token] = {
             'user_id': user_id,
             'email': email,
@@ -371,18 +410,40 @@ async def get_current_user(request: Request):
         if auth_header.startswith('Bearer '):
             session_token = auth_header[7:]
     
-    if not session_token or session_token not in user_sessions:
+    if not session_token:
         return Response(status_code=401, content='{"ok": false, "message": "Not authenticated"}', media_type='application/json')
-    
-    session = user_sessions[session_token]
-    
+
+    # Check in-memory cache first; fall back to MongoDB
+    session = user_sessions.get(session_token)
+    if not session:
+        db_session = await sessions_collection.find_one({'session_token': session_token}, {'_id': 0})
+        if db_session:
+            # Rehydrate in-memory cache
+            expires_at_val = db_session.get('expires_at')
+            if isinstance(expires_at_val, datetime):
+                expires_iso = expires_at_val.isoformat()
+            else:
+                expires_iso = expires_at_val
+            session = {
+                'user_id': db_session['user_id'],
+                'email': db_session['email'],
+                'name': db_session.get('name', ''),
+                'picture': db_session.get('picture', ''),
+                'expires_at': expires_iso
+            }
+            user_sessions[session_token] = session
+
+    if not session:
+        return Response(status_code=401, content='{"ok": false, "message": "Not authenticated"}', media_type='application/json')
+
     # Check expiry
     expires_at = datetime.fromisoformat(session['expires_at'])
     if expires_at.tzinfo is None:
         expires_at = expires_at.replace(tzinfo=timezone.utc)
     
     if expires_at < datetime.now(timezone.utc):
-        del user_sessions[session_token]
+        user_sessions.pop(session_token, None)
+        await sessions_collection.delete_one({'session_token': session_token})
         return Response(status_code=401, content='{"ok": false, "message": "Session expired"}', media_type='application/json')
     
     return {
@@ -399,13 +460,159 @@ async def get_current_user(request: Request):
 async def logout(request: Request, response: Response):
     """Logout and clear session"""
     session_token = request.cookies.get('session_token')
-    
-    if session_token and session_token in user_sessions:
-        del user_sessions[session_token]
-    
+    if not session_token:
+        auth_header = request.headers.get('Authorization', '')
+        if auth_header.startswith('Bearer '):
+            session_token = auth_header[7:]
+
+    if session_token:
+        user_sessions.pop(session_token, None)
+        await sessions_collection.delete_one({'session_token': session_token})
+
     response.delete_cookie(key='session_token', path='/')
     
     return {'ok': True, 'message': 'Logged out successfully'}
+
+
+# ============================================
+# EMAIL OTP AUTH ENDPOINTS
+# ============================================
+
+EMAIL_RE = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
+
+
+def _hash_otp(code: str) -> str:
+    return hashlib.sha256(code.encode('utf-8')).hexdigest()
+
+
+@app.post('/api/auth/email/send-otp')
+async def email_send_otp(request: Request):
+    """Generate a 6-digit OTP for the given email and store it (hashed) in MongoDB.
+    NOTE: This returns the OTP in the response for demo/dev only — wire to an email
+    provider (Resend/SendGrid) before going to production.
+    """
+    body = await request.json()
+    email = (body.get('email') or '').strip().lower()
+
+    if not EMAIL_RE.match(email):
+        return Response(status_code=400, content='{"ok": false, "message": "Invalid email"}', media_type='application/json')
+
+    code = f"{secrets.randbelow(900000) + 100000}"
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=5)
+
+    await otp_collection.update_one(
+        {'email': email},
+        {'$set': {
+            'email': email,
+            'code_hash': _hash_otp(code),
+            'expires_at': expires_at,
+            'attempts': 0,
+            'created_at': datetime.now(timezone.utc)
+        }},
+        upsert=True
+    )
+
+    logger.info(f"OTP generated for {email}")
+    # DEV ONLY: return code for demo testing. Remove this in production once email delivery is wired.
+    return {'ok': True, 'message': 'OTP sent', 'dev_code': code}
+
+
+@app.post('/api/auth/email/verify-otp')
+async def email_verify_otp(request: Request):
+    """Verify OTP, create/update user, and issue a session token."""
+    body = await request.json()
+    email = (body.get('email') or '').strip().lower()
+    code = (body.get('code') or '').strip()
+    name = (body.get('name') or '').strip() or email.split('@')[0]
+
+    if not EMAIL_RE.match(email) or not code:
+        return Response(status_code=400, content='{"ok": false, "message": "Invalid input"}', media_type='application/json')
+
+    otp_doc = await otp_collection.find_one({'email': email})
+    if not otp_doc:
+        return Response(status_code=400, content='{"ok": false, "message": "No OTP requested"}', media_type='application/json')
+
+    expires_at = otp_doc.get('expires_at')
+    if isinstance(expires_at, datetime):
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+        if expires_at < datetime.now(timezone.utc):
+            await otp_collection.delete_one({'email': email})
+            return Response(status_code=400, content='{"ok": false, "message": "OTP expired"}', media_type='application/json')
+
+    if otp_doc.get('attempts', 0) >= 5:
+        await otp_collection.delete_one({'email': email})
+        return Response(status_code=429, content='{"ok": false, "message": "Too many attempts"}', media_type='application/json')
+
+    if _hash_otp(code) != otp_doc.get('code_hash'):
+        await otp_collection.update_one({'email': email}, {'$inc': {'attempts': 1}})
+        return Response(status_code=400, content='{"ok": false, "message": "Invalid code"}', media_type='application/json')
+
+    # Success — consume OTP
+    await otp_collection.delete_one({'email': email})
+
+    # Upsert user
+    existing = await users_collection.find_one({'email': email}, {'_id': 0})
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    if existing:
+        user_id = existing['user_id']
+        await users_collection.update_one(
+            {'email': email},
+            {'$set': {'name': name, 'last_login_at': now_iso, 'provider': existing.get('provider', 'email')}}
+        )
+    else:
+        user_id = f"user_{secrets.token_hex(6)}"
+        await users_collection.insert_one({
+            'user_id': user_id,
+            'email': email,
+            'name': name,
+            'picture': '',
+            'provider': 'email',
+            'created_at': now_iso,
+            'last_login_at': now_iso
+        })
+        logger.info(f"New StumbleChat user created (email): {email}")
+
+    users_db[user_id] = {
+        'user_id': user_id,
+        'email': email,
+        'name': name,
+        'picture': '',
+        'provider': 'email',
+        'created_at': now_iso
+    }
+
+    # Issue session
+    session_token = secrets.token_urlsafe(32)
+    expires_at_session = datetime.now(timezone.utc) + timedelta(days=7)
+    await sessions_collection.insert_one({
+        'session_token': session_token,
+        'user_id': user_id,
+        'email': email,
+        'name': name,
+        'picture': '',
+        'expires_at': expires_at_session,
+        'created_at': datetime.now(timezone.utc)
+    })
+    user_sessions[session_token] = {
+        'user_id': user_id,
+        'email': email,
+        'name': name,
+        'picture': '',
+        'expires_at': expires_at_session.isoformat()
+    }
+
+    return {
+        'ok': True,
+        'user': {
+            'user_id': user_id,
+            'email': email,
+            'name': name,
+            'picture': '',
+            'session_token': session_token
+        }
+    }
 
 @app.get('/api/check-ip')
 async def check_ip_block(request: Request):
@@ -432,6 +639,42 @@ async def check_ip_block(request: Request):
         }
     
     return {'blocked': False}
+
+
+# ============================================
+# ADMIN ENDPOINTS — list persisted users & reports
+# ============================================
+
+ADMIN_TOKEN = os.environ.get('ADMIN_TOKEN', '')
+
+
+def _require_admin(request: Request) -> bool:
+    if not ADMIN_TOKEN:
+        return False
+    provided = request.headers.get('x-admin-token') or request.query_params.get('token')
+    return provided == ADMIN_TOKEN
+
+
+@app.get('/api/admin/users')
+async def admin_list_users(request: Request, limit: int = 100, skip: int = 0):
+    if not _require_admin(request):
+        return Response(status_code=401, content='{"ok": false, "message": "Unauthorized"}', media_type='application/json')
+
+    cursor = users_collection.find({}, {'_id': 0}).sort('created_at', -1).skip(skip).limit(min(limit, 500))
+    users = await cursor.to_list(length=limit)
+    total = await users_collection.count_documents({})
+    return {'ok': True, 'total': total, 'users': users}
+
+
+@app.get('/api/admin/reports')
+async def admin_list_reports(request: Request, limit: int = 100, skip: int = 0):
+    if not _require_admin(request):
+        return Response(status_code=401, content='{"ok": false, "message": "Unauthorized"}', media_type='application/json')
+
+    cursor = reports_collection.find({}, {'_id': 0, '_created_at': 0}).sort('timestamp', -1).skip(skip).limit(min(limit, 500))
+    items = await cursor.to_list(length=limit)
+    total = await reports_collection.count_documents({})
+    return {'ok': True, 'total': total, 'reports': items}
 
 @app.get('/api/stats')
 async def get_stats():
@@ -527,6 +770,24 @@ async def handle_register_user(sid, data):
     age = data.get('age', '')
     gender = data.get('gender', '')
     city = data.get('city', 'Global')
+    session_token = data.get('session_token')
+
+    # Resolve authenticated identity (if provided)
+    auth_user = None
+    if session_token:
+        auth_user = user_sessions.get(session_token)
+        if not auth_user:
+            try:
+                db_session = await sessions_collection.find_one({'session_token': session_token}, {'_id': 0})
+                if db_session:
+                    auth_user = {
+                        'user_id': db_session['user_id'],
+                        'email': db_session.get('email'),
+                        'name': db_session.get('name'),
+                        'picture': db_session.get('picture')
+                    }
+            except Exception as e:
+                logger.error(f"Failed to resolve session for socket: {e}")
     
     print(f'[SOCKET] Registering user {sid}: name={name}, city={city}', flush=True)
     logger.info(f'Registering user {sid}: name={name}, city={city}')
@@ -544,7 +805,9 @@ async def handle_register_user(sid, data):
         'age': age,
         'gender': gender,
         'city': city,
-        'emoji': random.choice(['😊', '😎', '🤗', '😺', '🦊', '🐼', '🦄', '🌟'])
+        'emoji': random.choice(['😊', '😎', '🤗', '😺', '🦊', '🐼', '🦄', '🌟']),
+        'user_id': (auth_user or {}).get('user_id'),
+        'email': (auth_user or {}).get('email'),
     }
     
     city_users[city] = city_users.get(city, 0) + 1
@@ -799,19 +1062,35 @@ async def handle_report_user(sid, data):
     reported_sid = partner_sid[0]
     reported_ip = user_ip_map.get(reported_sid, 'unknown')
     reporter_ip = user_ip_map.get(sid, 'unknown')
-    
+
+    # Try to attach user identities (if reporter / reported are authenticated)
+    reporter_user = active_connections.get(sid, {}) or {}
+    reported_user = active_connections.get(reported_sid, {}) or {}
+
     report = {
         'id': str(uuid.uuid4()),
         'reported_sid': reported_sid,
         'reported_ip': reported_ip,
+        'reported_user_id': reported_user.get('user_id'),
+        'reported_email': reported_user.get('email'),
+        'reported_name': reported_user.get('name'),
         'reporter_sid': sid,
         'reporter_ip': reporter_ip,
+        'reporter_user_id': reporter_user.get('user_id'),
+        'reporter_email': reporter_user.get('email'),
+        'reporter_name': reporter_user.get('name'),
         'comment': comment,
         'chat_history': chat_history,
         'room_id': room_id,
         'timestamp': datetime.now(timezone.utc).isoformat()
     }
     reports.append(report)
+
+    # Persist to MongoDB
+    try:
+        await reports_collection.insert_one({**report, '_created_at': datetime.now(timezone.utc)})
+    except Exception as e:
+        logger.error(f"Failed to persist report to MongoDB: {e}")
     
     if reported_ip != 'unknown':
         ip_report_count[reported_ip] = ip_report_count.get(reported_ip, 0) + 1

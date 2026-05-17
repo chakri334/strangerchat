@@ -1,7 +1,14 @@
 # Stumble Chat - Product Requirements Document
 
 ## Original Problem Statement
-Build a full-stack anonymous stranger chat web app named "Stumble Chat" with real-time text and audio chat capabilities, photo sharing with auto-disappearing feature, and user safety features.
+Build a full-stack anonymous stranger chat web app named "Stumble Chat" with real-time text chat (audio CANCELLED), disappearing-photo sharing, Google OAuth + email OTP sign-in, user reporting with IP banning, Telegram admin bot, GA4 analytics, and persistent user/report storage in MongoDB.
+
+## Recent Changes (Feb 2026)
+- **MongoDB persistence added** (`backend/db.py`): users, sessions, reports, email OTPs.
+- **Email OTP auth wired to backend** (`/api/auth/email/send-otp`, `/api/auth/email/verify-otp`) — replaces the previous localStorage-only demo flow. OTPs are hashed (SHA-256) in MongoDB with 5-min TTL.
+- **Google OAuth callback** now upserts the user and persists the session to MongoDB.
+- **Reports persist to MongoDB** (`reports_collection`) with reporter / reported identity attached when available.
+- **Admin endpoints** added (`/api/admin/users`, `/api/admin/reports`) protected by `ADMIN_TOKEN` header.
 
 ## Product Overview
 Stumble Chat is an anonymous, real-time chat application that connects random users for conversation. The app prioritizes user privacy and safety while providing an engaging chat experience.
