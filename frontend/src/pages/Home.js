@@ -8,6 +8,7 @@ import { Settings as SettingsIcon } from 'lucide-react';
 import { Analytics } from '../utils/analytics';
 import { setGeoTitle, trackCitySearch, trackGeoMatch } from '../utils/seo';
 import OnboardingModal from '../components/OnboardingModal';
+import AuthOnboarding from '../components/AuthOnboarding';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -27,6 +28,7 @@ const Home = () => {
   const [userName, setUserName] = useState('');
   const [userAge, setUserAge] = useState('');
   const [userGender, setUserGender] = useState('');
+  const [nearbyUsers, setNearbyUsers] = useState([]);
   const [photoToView, setPhotoToView] = useState(null);
   const [isBlocked, setIsBlocked] = useState(false);
   const [blockMessage, setBlockMessage] = useState('');
@@ -34,6 +36,7 @@ const Home = () => {
   const [showOnboarding, setShowOnboarding] = useState(
     () => !localStorage.getItem('hasSeenOnboarding')
   );
+  const [isAuthed, setIsAuthed] = useState(() => !!localStorage.getItem('authSession'));
   const socketRef = useRef(null);
   const searchTimerRef = useRef(null);   // tracks the active search timeout
   const searchCountRef = useRef(0);      // prevents stale closure bug on isSearching
@@ -124,6 +127,7 @@ const Home = () => {
     
     // Detect location
     detectUserLocation();
+    loadNearbyUsers(savedCity);
     
     newSocket.on('connect', () => {
       console.log('✓ Connected to server');
@@ -207,6 +211,7 @@ const Home = () => {
     });
     
     newSocket.on('stats_update', (data) => {
+      if (savedGender === 'Male') loadNearbyUsers(savedCity);
       console.log('Stats updated:', data);
       setStats(data);
     });
@@ -271,6 +276,27 @@ const Home = () => {
     };
   }, []);
   
+  const loadNearbyUsers = async (city) => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/active-users?city=${encodeURIComponent(city || 'Global')}`);
+      const data = await res.json();
+      const mySid = socketRef.current?.id;
+      setNearbyUsers((data.users || []).filter((u) => u.sid !== mySid));
+    } catch (e) {
+      console.log('Failed to load nearby users');
+    }
+  };
+
+  const handleDirectChat = (targetSid) => {
+    if (!socket || !socket.connected) {
+      toast.error('Not connected yet');
+      return;
+    }
+    setIsSearchingSync(true);
+    socket.emit('join_queue', { city: userCity, target_sid: targetSid });
+    toast.info('Connecting you to selected user...');
+  };
+
   const handleConnect = () => {
     if (!socket) {
       toast.error('Please wait, initializing...');
@@ -387,6 +413,10 @@ const Home = () => {
 
   // Show waiting page when searching
   // Show onboarding on first visit
+  if (!isAuthed) {
+    return <AuthOnboarding onAuthenticated={() => setIsAuthed(true)} />;
+  }
+
   if (showOnboarding) {
     return <OnboardingModal onAccept={() => setShowOnboarding(false)} />;
   }
@@ -445,16 +475,49 @@ const Home = () => {
               </p>
             </div>
           </div>
-          <button
-            onClick={() => navigate('/settings')}
-            className="p-3 rounded-full bg-white/5 hover:bg-white/10 transition-colors"
-            data-testid="settings-button"
-          >
-            <SettingsIcon size={20} />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                localStorage.removeItem('authSession');
+                setIsAuthed(false);
+              }}
+              className="px-3 py-2 rounded-full bg-white/5 hover:bg-white/10 transition-colors text-xs text-gray-300"
+            >
+              Logout
+            </button>
+            <button
+              onClick={() => navigate('/settings')}
+              className="p-3 rounded-full bg-white/5 hover:bg-white/10 transition-colors"
+              data-testid="settings-button"
+            >
+              <SettingsIcon size={20} />
+            </button>
+          </div>
         </header>
         
         {/* Location detection happens in background - no UI shown */}
+        {userGender === 'Male' && (
+          <div className="px-6">
+            <div className="max-w-2xl mx-auto bg-white/5 rounded-2xl p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="font-bold">Nearby Active Users</h2>
+                <button onClick={() => loadNearbyUsers(userCity)} className="text-xs text-gray-300 hover:text-white">Refresh</button>
+              </div>
+              <div className="space-y-2 max-h-60 overflow-auto">
+                {nearbyUsers.length === 0 ? (
+                  <p className="text-sm text-gray-400">No nearby active users yet. Try refresh in a moment.</p>
+                ) : nearbyUsers.map((u) => (
+                  <button key={u.sid} onClick={() => handleDirectChat(u.sid)} className="w-full text-left bg-white/5 hover:bg-white/10 rounded-xl p-3 transition-all">
+                    <div className="font-medium">{u.emoji} {u.name}</div>
+                    <div className="text-xs text-gray-400">{u.city} {u.age ? `• ${u.age}` : ''}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+
         
         {/* Connect Button */}
         <div className="flex-1 flex items-center justify-center px-6 py-12">
