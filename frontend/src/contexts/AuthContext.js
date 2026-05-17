@@ -17,13 +17,6 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   const checkAuth = useCallback(async () => {
-    // CRITICAL: If returning from OAuth callback, skip the /me check.
-    // AuthCallback will exchange the session_id and establish the session first.
-    if (window.location.hash?.includes('session_id=')) {
-      setLoading(false);
-      return;
-    }
-
     try {
       // Check localStorage first for quick load
       const storedUser = localStorage.getItem('user');
@@ -31,26 +24,33 @@ export const AuthProvider = ({ children }) => {
         setUser(JSON.parse(storedUser));
       }
 
-      // Verify with backend
-      const response = await fetch(`${BACKEND_URL}/api/auth/me`, {
-        credentials: 'include',
-      });
+      // Verify with backend using session token
+      const sessionToken = localStorage.getItem('session_token');
+      if (sessionToken) {
+        const response = await fetch(`${BACKEND_URL}/api/auth/me`, {
+          headers: {
+            'Authorization': `Bearer ${sessionToken}`
+          },
+          credentials: 'include',
+        });
 
-      if (response.ok) {
-        const data = await response.json();
-        if (data.ok && data.user) {
-          setUser(data.user);
-          localStorage.setItem('user', JSON.stringify(data.user));
+        if (response.ok) {
+          const data = await response.json();
+          if (data.ok && data.user) {
+            setUser(data.user);
+            localStorage.setItem('user', JSON.stringify(data.user));
+          } else {
+            setUser(null);
+            localStorage.removeItem('user');
+            localStorage.removeItem('session_token');
+          }
         } else {
           setUser(null);
           localStorage.removeItem('user');
+          localStorage.removeItem('session_token');
         }
-      } else {
-        setUser(null);
-        localStorage.removeItem('user');
       }
     } catch (error) {
-      console.error('Auth check error:', error);
       // Keep localStorage user if backend is unreachable
     } finally {
       setLoading(false);
@@ -62,25 +62,72 @@ export const AuthProvider = ({ children }) => {
   }, [checkAuth]);
 
   /**
-   * Start Google Sign-In flow using Emergent Auth.
-   * REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
+   * Start Google Sign-In flow using popup
    */
-  const signInWithGoogle = () => {
-    const redirectUrl = window.location.origin + '/';
-    window.location.href = `https://auth.emergentagent.com/?redirect=${encodeURIComponent(redirectUrl)}`;
+  const signInWithGoogle = async () => {
+    try {
+      // Get OAuth URL from backend
+      const response = await fetch(`${BACKEND_URL}/api/auth/google/start`);
+      const data = await response.json();
+      
+      if (!data.ok || !data.auth_url) {
+        console.error('Failed to start Google sign-in:', data.message);
+        return;
+      }
+      
+      // Open popup for Google OAuth
+      const width = 500;
+      const height = 600;
+      const left = window.screenX + (window.outerWidth - width) / 2;
+      const top = window.screenY + (window.outerHeight - height) / 2;
+      
+      window.open(
+        data.auth_url,
+        'google-auth',
+        `width=${width},height=${height},left=${left},top=${top},scrollbars=yes`
+      );
+    } catch (error) {
+      console.error('Google auth error:', error);
+    }
   };
+
+  // Listen for messages from OAuth popup
+  useEffect(() => {
+    const handleMessage = (event) => {
+      if (event.data?.type === 'google-auth-success' && event.data?.user) {
+        const userData = event.data.user;
+        setUser(userData);
+        localStorage.setItem('user', JSON.stringify(userData));
+        if (userData.session_token) {
+          localStorage.setItem('session_token', userData.session_token);
+        }
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
 
   const logout = async () => {
     try {
-      await fetch(`${BACKEND_URL}/api/auth/logout`, {
-        method: 'POST',
-        credentials: 'include',
-      });
+      const sessionToken = localStorage.getItem('session_token');
+      if (sessionToken) {
+        await fetch(`${BACKEND_URL}/api/auth/logout`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${sessionToken}`
+          },
+          credentials: 'include',
+        });
+      }
     } catch (error) {
-      console.error('Logout error:', error);
+      // Ignore logout errors
     } finally {
       setUser(null);
       localStorage.removeItem('user');
+      localStorage.removeItem('session_token');
+      localStorage.removeItem('authSession');
+      localStorage.removeItem('authMethod');
     }
   };
 

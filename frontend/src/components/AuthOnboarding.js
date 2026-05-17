@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Mail, ArrowRight, UserRound } from 'lucide-react';
 import { toast } from 'sonner';
 
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const OTP_TTL_MS = 5 * 60 * 1000;
 
 const AuthOnboarding = ({ onAuthenticated }) => {
@@ -18,6 +19,38 @@ const AuthOnboarding = ({ onAuthenticated }) => {
     }
   }, [otpStep]);
 
+  // Listen for messages from OAuth popup
+  useEffect(() => {
+    const handleMessage = (event) => {
+      if (event.data?.type === 'google-auth-success' && event.data?.user) {
+        const user = event.data.user;
+        // Store user data
+        localStorage.setItem('user', JSON.stringify(user));
+        localStorage.setItem('authSession', JSON.stringify({
+          mode: 'google',
+          createdAt: Date.now(),
+          email: user.email,
+          name: user.name,
+          verified: true
+        }));
+        localStorage.setItem('authMethod', 'google');
+        if (user.email) localStorage.setItem('accountEmail', user.email);
+        if (user.name) localStorage.setItem('userName', user.name);
+        if (user.session_token) localStorage.setItem('session_token', user.session_token);
+        
+        toast.success(`Welcome, ${user.name || 'User'}!`);
+        setLoading(false);
+        onAuthenticated();
+      } else if (event.data?.type === 'google-auth-error') {
+        toast.error(event.data.message || 'Google sign-in failed');
+        setLoading(false);
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [onAuthenticated]);
+
   const finishSession = (mode, identity = {}) => {
     const now = Date.now();
     localStorage.setItem('authSession', JSON.stringify({ mode, createdAt: now, ...identity }));
@@ -30,14 +63,54 @@ const AuthOnboarding = ({ onAuthenticated }) => {
   };
 
   /**
-   * Start Google Sign-In flow using Emergent Auth.
-   * REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS
+   * Start Google Sign-In flow using popup window
    */
-  const handleGoogle = () => {
+  const handleGoogle = async () => {
     setLoading(true);
-    // Redirect to Emergent Auth with current origin as redirect
-    const redirectUrl = window.location.origin + '/';
-    window.location.href = `https://auth.emergentagent.com/?redirect=${encodeURIComponent(redirectUrl)}`;
+    
+    try {
+      // Get OAuth URL from backend
+      const response = await fetch(`${BACKEND_URL}/api/auth/google/start`);
+      const data = await response.json();
+      
+      if (!data.ok || !data.auth_url) {
+        toast.error(data.message || 'Failed to start Google sign-in');
+        setLoading(false);
+        return;
+      }
+      
+      // Open popup for Google OAuth
+      const width = 500;
+      const height = 600;
+      const left = window.screenX + (window.outerWidth - width) / 2;
+      const top = window.screenY + (window.outerHeight - height) / 2;
+      
+      const popup = window.open(
+        data.auth_url,
+        'google-auth',
+        `width=${width},height=${height},left=${left},top=${top},scrollbars=yes`
+      );
+      
+      // Check if popup was blocked
+      if (!popup) {
+        toast.error('Popup blocked. Please allow popups for this site.');
+        setLoading(false);
+        return;
+      }
+      
+      // Poll to detect when popup closes (fallback if postMessage fails)
+      const checkPopup = setInterval(() => {
+        if (popup.closed) {
+          clearInterval(checkPopup);
+          setLoading(false);
+        }
+      }, 500);
+      
+    } catch (error) {
+      console.error('Google auth error:', error);
+      toast.error('Failed to start Google sign-in');
+      setLoading(false);
+    }
   };
 
   const handleSendOtp = () => {

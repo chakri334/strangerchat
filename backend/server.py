@@ -37,9 +37,15 @@ ip_blocks: Dict[str, datetime] = {}  # ip -> block_expires_at
 user_ip_map: Dict[str, str] = {}  # socket_id -> ip_address
 ip_report_count: Dict[str, int] = {}  # ip -> report_count
 
-# In-memory storage for user sessions (Emergent Google Auth)
+# In-memory storage for user sessions (Google Auth)
 user_sessions: Dict[str, dict] = {}  # session_token -> {user_id, email, name, picture, expires_at}
 users_db: Dict[str, dict] = {}  # user_id -> {user_id, email, name, picture, created_at}
+google_auth_states: Dict[str, datetime] = {}  # state -> created_at (for CSRF protection)
+
+# Google OAuth Config
+GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '')
+GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET', '')
+GOOGLE_REDIRECT_URI = os.environ.get('GOOGLE_REDIRECT_URI', '')
 
 # Photo tracking for disappearing photos
 photo_messages: Dict[str, dict] = {}  # photo_id -> {sender_sid, receiver_sid, opened, timer_started}
@@ -123,100 +129,183 @@ async def root():
     return {'message': 'Chat server running'}
 
 # ============================================
-# EMERGENT GOOGLE AUTH ENDPOINTS
+# DIRECT GOOGLE OAUTH ENDPOINTS (StumbleChat)
 # ============================================
 
-@app.post('/api/auth/session')
-async def exchange_session(request: Request, response: Response):
-    """
-    Exchange Emergent session_id for user data and set session cookie.
-    REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
-    """
+@app.get('/api/auth/google/start')
+async def google_auth_start():
+    """Start Google OAuth flow - returns URL to redirect user to"""
+    if not GOOGLE_CLIENT_ID or not GOOGLE_REDIRECT_URI:
+        return {'ok': False, 'message': 'Google OAuth not configured'}
+    
+    # Generate CSRF state token
+    state = secrets.token_urlsafe(32)
+    google_auth_states[state] = datetime.now(timezone.utc)
+    
+    # Clean up old states (older than 10 minutes)
+    cutoff = datetime.now(timezone.utc) - timedelta(minutes=10)
+    expired_states = [s for s, t in google_auth_states.items() if t < cutoff]
+    for s in expired_states:
+        del google_auth_states[s]
+    
+    # Build Google OAuth URL
+    params = {
+        'client_id': GOOGLE_CLIENT_ID,
+        'redirect_uri': GOOGLE_REDIRECT_URI,
+        'response_type': 'code',
+        'scope': 'openid email profile',
+        'state': state,
+        'prompt': 'select_account',
+        'access_type': 'offline'
+    }
+    auth_url = f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(params)}"
+    
+    return {'ok': True, 'auth_url': auth_url, 'state': state}
+
+@app.get('/api/auth/google/callback')
+async def google_auth_callback(code: Optional[str] = None, state: Optional[str] = None, error: Optional[str] = None):
+    """Handle Google OAuth callback"""
+    
+    # Handle errors from Google
+    if error:
+        logger.error(f"Google OAuth error: {error}")
+        return Response(
+            content=f"""<html><body><script>
+                window.opener && window.opener.postMessage({{type:'google-auth-error', message:'{error}'}}, '*');
+                window.close();
+            </script></body></html>""",
+            media_type="text/html"
+        )
+    
+    # Verify state (CSRF protection)
+    if not state or state not in google_auth_states:
+        logger.error("Invalid or missing state parameter")
+        return Response(
+            content="""<html><body><script>
+                window.opener && window.opener.postMessage({type:'google-auth-error', message:'Invalid state'}, '*');
+                window.close();
+            </script></body></html>""",
+            media_type="text/html"
+        )
+    
+    # Remove used state
+    del google_auth_states[state]
+    
+    if not code:
+        return Response(
+            content="""<html><body><script>
+                window.opener && window.opener.postMessage({type:'google-auth-error', message:'No authorization code'}, '*');
+                window.close();
+            </script></body></html>""",
+            media_type="text/html"
+        )
+    
     try:
-        body = await request.json()
-        session_id = body.get('session_id')
-        
-        if not session_id:
-            return {'ok': False, 'message': 'Missing session_id'}
-        
-        # Call Emergent Auth to get user data
-        auth_response = requests.get(
-            'https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data',
-            headers={'X-Session-ID': session_id},
+        # Exchange code for tokens
+        token_response = requests.post(
+            'https://oauth2.googleapis.com/token',
+            data={
+                'code': code,
+                'client_id': GOOGLE_CLIENT_ID,
+                'client_secret': GOOGLE_CLIENT_SECRET,
+                'redirect_uri': GOOGLE_REDIRECT_URI,
+                'grant_type': 'authorization_code'
+            },
             timeout=10
         )
         
-        if auth_response.status_code != 200:
-            logger.error(f"Emergent auth failed: {auth_response.status_code}")
-            return {'ok': False, 'message': 'Authentication failed'}
+        if token_response.status_code != 200:
+            logger.error(f"Token exchange failed: {token_response.text}")
+            raise Exception("Token exchange failed")
         
-        user_data = auth_response.json()
-        email = user_data.get('email', '').lower()
-        session_token = user_data.get('session_token')
+        token_data = token_response.json()
+        access_token = token_data.get('access_token')
         
-        if not email or not session_token:
-            return {'ok': False, 'message': 'Invalid session data'}
+        if not access_token:
+            raise Exception("No access token received")
         
-        # Generate user_id if new user
-        user_id = f"user_{uuid.uuid4().hex[:12]}"
+        # Get user profile from Google
+        profile_response = requests.get(
+            'https://www.googleapis.com/oauth2/v3/userinfo',
+            headers={'Authorization': f'Bearer {access_token}'},
+            timeout=10
+        )
         
-        # Check if user exists
-        existing_user = None
+        if profile_response.status_code != 200:
+            raise Exception("Failed to get user profile")
+        
+        profile = profile_response.json()
+        email = (profile.get('email') or '').strip().lower()
+        name = profile.get('name', '')
+        picture = profile.get('picture', '')
+        
+        if not email:
+            raise Exception("No email in profile")
+        
+        # Find or create user
+        user_id = None
         for uid, udata in users_db.items():
             if udata.get('email') == email:
-                existing_user = udata
                 user_id = uid
                 break
         
-        if not existing_user:
-            # Create new user
+        if not user_id:
+            user_id = f"user_{secrets.token_hex(6)}"
             users_db[user_id] = {
                 'user_id': user_id,
                 'email': email,
-                'name': user_data.get('name', ''),
-                'picture': user_data.get('picture', ''),
+                'name': name,
+                'picture': picture,
                 'created_at': datetime.now(timezone.utc).isoformat()
             }
-            logger.info(f"New user created: {email}")
+            logger.info(f"New StumbleChat user created: {email}")
         else:
             # Update existing user
-            users_db[user_id]['name'] = user_data.get('name', existing_user.get('name', ''))
-            users_db[user_id]['picture'] = user_data.get('picture', existing_user.get('picture', ''))
+            users_db[user_id]['name'] = name
+            users_db[user_id]['picture'] = picture
+            logger.info(f"Existing user logged in: {email}")
         
-        # Store session with 7-day expiry
+        # Create session token
+        session_token = secrets.token_urlsafe(32)
         expires_at = datetime.now(timezone.utc) + timedelta(days=7)
+        
         user_sessions[session_token] = {
             'user_id': user_id,
             'email': email,
-            'name': user_data.get('name', ''),
-            'picture': user_data.get('picture', ''),
+            'name': name,
+            'picture': picture,
             'expires_at': expires_at.isoformat()
         }
         
-        # Set httpOnly cookie
-        response.set_cookie(
-            key='session_token',
-            value=session_token,
-            httponly=True,
-            secure=True,
-            samesite='none',
-            path='/',
-            max_age=7 * 24 * 60 * 60  # 7 days
-        )
-        
-        return {
-            'ok': True,
-            'user': {
-                'user_id': user_id,
-                'email': email,
-                'name': user_data.get('name', ''),
-                'picture': user_data.get('picture', '')
-            }
+        # Send success message to opener window
+        user_data = {
+            'user_id': user_id,
+            'email': email,
+            'name': name,
+            'picture': picture,
+            'session_token': session_token
         }
         
+        import json
+        user_json = json.dumps(user_data)
+        
+        return Response(
+            content=f"""<html><body><script>
+                window.opener && window.opener.postMessage({{type:'google-auth-success', user:{user_json}}}, '*');
+                window.close();
+            </script></body></html>""",
+            media_type="text/html"
+        )
+        
     except Exception as e:
-        logger.error(f"Session exchange error: {e}")
-        return {'ok': False, 'message': 'Authentication failed'}
+        logger.error(f"Google OAuth error: {e}")
+        return Response(
+            content="""<html><body><script>
+                window.opener && window.opener.postMessage({type:'google-auth-error', message:'Authentication failed'}, '*');
+                window.close();
+            </script></body></html>""",
+            media_type="text/html"
+        )
 
 @app.get('/api/auth/me')
 async def get_current_user(request: Request):
