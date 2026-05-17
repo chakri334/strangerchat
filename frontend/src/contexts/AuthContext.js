@@ -1,58 +1,64 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+const USER_KEY = 'user';
+const SESSION_TOKEN_KEY = 'session_token'; // sessionStorage only (cleared on tab close)
 
 const AuthContext = createContext(null);
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
+  if (!context) throw new Error('useAuth must be used within an AuthProvider');
   return context;
 };
 
+const readCachedUser = () => {
+  try {
+    const raw = localStorage.getItem(USER_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
+
+const clearAuthStorage = () => {
+  localStorage.removeItem(USER_KEY);
+  localStorage.removeItem('authSession');
+  localStorage.removeItem('authMethod');
+  sessionStorage.removeItem(SESSION_TOKEN_KEY);
+  // Migrate-away from old localStorage location, if any
+  localStorage.removeItem(SESSION_TOKEN_KEY);
+};
+
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(readCachedUser);
   const [loading, setLoading] = useState(true);
 
   const checkAuth = useCallback(async () => {
     try {
-      // Check localStorage first for quick load
-      const storedUser = localStorage.getItem('user');
-      if (storedUser) {
-        setUser(JSON.parse(storedUser));
-      }
+      // Prefer httpOnly cookie; fall back to legacy Bearer token (sessionStorage)
+      const token = sessionStorage.getItem(SESSION_TOKEN_KEY) || localStorage.getItem(SESSION_TOKEN_KEY);
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
-      // Verify with backend using session token
-      const sessionToken = localStorage.getItem('session_token');
-      if (sessionToken) {
-        const response = await fetch(`${BACKEND_URL}/api/auth/me`, {
-          headers: {
-            'Authorization': `Bearer ${sessionToken}`
-          },
-          credentials: 'include',
-        });
+      const response = await fetch(`${BACKEND_URL}/api/auth/me`, {
+        headers,
+        credentials: 'include',
+      });
 
-        if (response.ok) {
-          const data = await response.json();
-          if (data.ok && data.user) {
-            setUser(data.user);
-            localStorage.setItem('user', JSON.stringify(data.user));
-          } else {
-            setUser(null);
-            localStorage.removeItem('user');
-            localStorage.removeItem('session_token');
-          }
-        } else {
-          setUser(null);
-          localStorage.removeItem('user');
-          localStorage.removeItem('session_token');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.ok && data.user) {
+          setUser(data.user);
+          localStorage.setItem(USER_KEY, JSON.stringify(data.user));
+          return;
         }
       }
-    } catch (error) {
-      // Keep localStorage user if backend is unreachable
-      console.warn('Auth check failed, using cached user:', error.message);
+
+      // Auth failed → clear stale state
+      setUser(null);
+      clearAuthStorage();
+    } catch (err) {
+      console.warn('Auth check failed, using cached user:', err.message);
     } finally {
       setLoading(false);
     }
@@ -62,76 +68,59 @@ export const AuthProvider = ({ children }) => {
     checkAuth();
   }, [checkAuth]);
 
-  /**
-   * Start Google Sign-In flow using popup
-   */
-  const signInWithGoogle = async () => {
+  const signInWithGoogle = useCallback(async () => {
     try {
-      // Get OAuth URL from backend
-      const response = await fetch(`${BACKEND_URL}/api/auth/google/start`);
+      const response = await fetch(`${BACKEND_URL}/api/auth/google/start`, { credentials: 'include' });
       const data = await response.json();
-      
       if (!data.ok || !data.auth_url) {
         console.error('Failed to start Google sign-in:', data.message);
         return;
       }
-      
-      // Open popup for Google OAuth
       const width = 500;
       const height = 600;
       const left = window.screenX + (window.outerWidth - width) / 2;
       const top = window.screenY + (window.outerHeight - height) / 2;
-      
       window.open(
         data.auth_url,
         'google-auth',
         `width=${width},height=${height},left=${left},top=${top},scrollbars=yes`
       );
-    } catch (error) {
-      console.error('Google auth error:', error);
+    } catch (err) {
+      console.error('Google auth error:', err);
     }
-  };
+  }, []);
 
   // Listen for messages from OAuth popup
   useEffect(() => {
     const handleMessage = (event) => {
-      if (event.data?.type === 'google-auth-success' && event.data?.user) {
-        const userData = event.data.user;
-        setUser(userData);
-        localStorage.setItem('user', JSON.stringify(userData));
-        if (userData.session_token) {
-          localStorage.setItem('session_token', userData.session_token);
-        }
+      if (event.data?.type !== 'google-auth-success' || !event.data?.user) return;
+      const userData = event.data.user;
+      setUser(userData);
+      localStorage.setItem(USER_KEY, JSON.stringify(userData));
+      if (userData.session_token) {
+        // Keep session_token in sessionStorage only as a fallback when cookies are blocked.
+        sessionStorage.setItem(SESSION_TOKEN_KEY, userData.session_token);
       }
     };
-
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
   }, []);
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     try {
-      const sessionToken = localStorage.getItem('session_token');
-      if (sessionToken) {
-        await fetch(`${BACKEND_URL}/api/auth/logout`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${sessionToken}`
-          },
-          credentials: 'include',
-        });
-      }
-    } catch (error) {
-      // Log but don't block logout if server is unreachable
-      console.warn('Logout request failed:', error.message);
+      const token = sessionStorage.getItem(SESSION_TOKEN_KEY) || localStorage.getItem(SESSION_TOKEN_KEY);
+      await fetch(`${BACKEND_URL}/api/auth/logout`, {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        credentials: 'include',
+      });
+    } catch (err) {
+      console.warn('Logout request failed:', err.message);
     } finally {
       setUser(null);
-      localStorage.removeItem('user');
-      localStorage.removeItem('session_token');
-      localStorage.removeItem('authSession');
-      localStorage.removeItem('authMethod');
+      clearAuthStorage();
     }
-  };
+  }, []);
 
   const value = {
     user,

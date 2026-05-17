@@ -207,196 +207,206 @@ async def google_auth_start(request: Request):
 
 @app.get('/api/auth/google/callback')
 async def google_auth_callback(request: Request, code: Optional[str] = None, state: Optional[str] = None, error: Optional[str] = None):
-    """Handle Google OAuth callback"""
-    
-    # Determine the trusted frontend origin for postMessage
-    # Only send to known trusted origins
-    frontend_origin = "https://stumblechat.online"  # Default to production
-    referer = request.headers.get('referer', '')
-    origin = request.headers.get('origin', '')
-    
-    for allowed in ALLOWED_ORIGINS:
-        if allowed in referer or allowed in origin:
-            frontend_origin = allowed
-            break
-    
-    # Use configured GOOGLE_REDIRECT_URI if set (must match what was used in /start)
-    if GOOGLE_REDIRECT_URI:
-        redirect_uri = GOOGLE_REDIRECT_URI
-    else:
-        host = request.headers.get('host', '')
-        scheme = request.headers.get('x-forwarded-proto', 'https')
-        redirect_uri = f"{scheme}://{host}/api/auth/google/callback"
-    
-    # Handle errors from Google
+    """Handle Google OAuth callback. Thin orchestrator — see helpers below."""
+    frontend_origin = _resolve_trusted_origin(request)
+    redirect_uri = _resolve_redirect_uri(request)
+
     if error:
         logger.error(f"Google OAuth error: {error}")
-        return Response(
-            content=f"""<html><body><script>
-                window.opener && window.opener.postMessage({{type:'google-auth-error', message:'{error}'}}, '{frontend_origin}');
-                window.close();
-            </script></body></html>""",
-            media_type="text/html"
-        )
-    
-    # Verify state (CSRF protection)
+        return _oauth_popup_error(error, frontend_origin)
+
     if not state or state not in google_auth_states:
         logger.error("Invalid or missing state parameter")
-        return Response(
-            content=f"""<html><body><script>
-                window.opener && window.opener.postMessage({{type:'google-auth-error', message:'Invalid state'}}, '{frontend_origin}');
-                window.close();
-            </script></body></html>""",
-            media_type="text/html"
-        )
-    
-    # Remove used state
+        return _oauth_popup_error('Invalid state', frontend_origin)
     del google_auth_states[state]
-    
+
     if not code:
-        return Response(
-            content=f"""<html><body><script>
-                window.opener && window.opener.postMessage({{type:'google-auth-error', message:'No authorization code'}}, '{frontend_origin}');
-                window.close();
-            </script></body></html>""",
-            media_type="text/html"
-        )
-    
+        return _oauth_popup_error('No authorization code', frontend_origin)
+
     try:
-        # Exchange code for tokens
-        token_response = requests.post(
-            'https://oauth2.googleapis.com/token',
-            data={
-                'code': code,
-                'client_id': GOOGLE_CLIENT_ID,
-                'client_secret': GOOGLE_CLIENT_SECRET,
-                'redirect_uri': redirect_uri,
-                'grant_type': 'authorization_code'
-            },
-            timeout=10
+        profile = _exchange_code_for_profile(code, redirect_uri)
+        user_id = await _upsert_user_from_google(profile)
+        session_token = await _issue_session(user_id, profile['email'], profile['name'], profile.get('picture', ''))
+        return _oauth_popup_success(
+            user_id=user_id,
+            email=profile['email'],
+            name=profile['name'],
+            picture=profile.get('picture', ''),
+            session_token=session_token,
+            frontend_origin=frontend_origin,
         )
-        
-        if token_response.status_code != 200:
-            logger.error(f"Token exchange failed: {token_response.text}")
-            raise Exception("Token exchange failed")
-        
-        token_data = token_response.json()
-        access_token = token_data.get('access_token')
-        
-        if not access_token:
-            raise Exception("No access token received")
-        
-        # Get user profile from Google
-        profile_response = requests.get(
-            'https://www.googleapis.com/oauth2/v3/userinfo',
-            headers={'Authorization': f'Bearer {access_token}'},
-            timeout=10
+    except Exception as e:
+        logger.error(f"Google OAuth error: {e}")
+        return _oauth_popup_error('Authentication failed', frontend_origin)
+
+
+# ── OAuth helper functions ───────────────────────────────────────────────────
+
+def _resolve_trusted_origin(request: Request) -> str:
+    """Pick a trusted frontend origin for postMessage. Defaults to production."""
+    referer = request.headers.get('referer', '')
+    origin = request.headers.get('origin', '')
+    for allowed in ALLOWED_ORIGINS:
+        if allowed in referer or allowed in origin:
+            return allowed
+    return "https://stumblechat.online"
+
+
+def _resolve_redirect_uri(request: Request) -> str:
+    if GOOGLE_REDIRECT_URI:
+        return GOOGLE_REDIRECT_URI
+    host = request.headers.get('host', '')
+    scheme = request.headers.get('x-forwarded-proto', 'https')
+    return f"{scheme}://{host}/api/auth/google/callback"
+
+
+def _oauth_popup_error(message: str, frontend_origin: str) -> Response:
+    safe_msg = (message or '').replace("'", "\\'").replace('\n', ' ')
+    html = (
+        f"<html><body><script>"
+        f"window.opener && window.opener.postMessage("
+        f"{{type:'google-auth-error', message:'{safe_msg}'}}, '{frontend_origin}');"
+        f"window.close();</script></body></html>"
+    )
+    return Response(content=html, media_type="text/html")
+
+
+def _oauth_popup_success(*, user_id: str, email: str, name: str, picture: str,
+                        session_token: str, frontend_origin: str) -> Response:
+    import json as _json
+    user_data = {
+        'user_id': user_id,
+        'email': email,
+        'name': name,
+        'picture': picture,
+        'session_token': session_token,
+    }
+    user_json = _json.dumps(user_data)
+    html = (
+        f"<html><body><script>"
+        f"window.opener && window.opener.postMessage("
+        f"{{type:'google-auth-success', user:{user_json}}}, '{frontend_origin}');"
+        f"window.close();</script></body></html>"
+    )
+    resp = Response(content=html, media_type="text/html")
+    _set_session_cookie(resp, session_token)
+    return resp
+
+
+def _exchange_code_for_profile(code: str, redirect_uri: str) -> dict:
+    """Exchange Google auth code for a profile dict {email,name,picture}."""
+    token_response = requests.post(
+        'https://oauth2.googleapis.com/token',
+        data={
+            'code': code,
+            'client_id': GOOGLE_CLIENT_ID,
+            'client_secret': GOOGLE_CLIENT_SECRET,
+            'redirect_uri': redirect_uri,
+            'grant_type': 'authorization_code',
+        },
+        timeout=10,
+    )
+    if token_response.status_code != 200:
+        logger.error(f"Token exchange failed: {token_response.text}")
+        raise RuntimeError("Token exchange failed")
+
+    access_token = token_response.json().get('access_token')
+    if not access_token:
+        raise RuntimeError("No access token received")
+
+    profile_response = requests.get(
+        'https://www.googleapis.com/oauth2/v3/userinfo',
+        headers={'Authorization': f'Bearer {access_token}'},
+        timeout=10,
+    )
+    if profile_response.status_code != 200:
+        raise RuntimeError("Failed to get user profile")
+
+    profile = profile_response.json()
+    email = (profile.get('email') or '').strip().lower()
+    if not email:
+        raise RuntimeError("No email in profile")
+    return {
+        'email': email,
+        'name': profile.get('name', ''),
+        'picture': profile.get('picture', ''),
+    }
+
+
+async def _upsert_user_from_google(profile: dict) -> str:
+    """Insert/update a user in MongoDB using a Google profile. Returns user_id."""
+    email = profile['email']
+    name = profile['name']
+    picture = profile.get('picture', '')
+    existing = await users_collection.find_one({'email': email}, {'_id': 0})
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    if existing:
+        user_id = existing['user_id']
+        await users_collection.update_one(
+            {'email': email},
+            {'$set': {'name': name, 'picture': picture, 'last_login_at': now_iso, 'provider': 'google'}},
         )
-        
-        if profile_response.status_code != 200:
-            raise Exception("Failed to get user profile")
-        
-        profile = profile_response.json()
-        email = (profile.get('email') or '').strip().lower()
-        name = profile.get('name', '')
-        picture = profile.get('picture', '')
-        
-        if not email:
-            raise Exception("No email in profile")
-        
-        # Find or create user (upsert in MongoDB)
-        existing = await users_collection.find_one({'email': email}, {'_id': 0})
-
-        now_iso = datetime.now(timezone.utc).isoformat()
-
-        if existing:
-            user_id = existing['user_id']
-            await users_collection.update_one(
-                {'email': email},
-                {'$set': {
-                    'name': name,
-                    'picture': picture,
-                    'last_login_at': now_iso,
-                    'provider': 'google'
-                }}
-            )
-            logger.info(f"Existing user logged in: {email}")
-        else:
-            user_id = f"user_{secrets.token_hex(6)}"
-            await users_collection.insert_one({
-                'user_id': user_id,
-                'email': email,
-                'name': name,
-                'picture': picture,
-                'provider': 'google',
-                'created_at': now_iso,
-                'last_login_at': now_iso
-            })
-            logger.info(f"New StumbleChat user created (google): {email}")
-
-        # Keep in-memory cache for quick access
-        users_db[user_id] = {
+        logger.info(f"Existing user logged in: {email}")
+    else:
+        user_id = f"user_{secrets.token_hex(6)}"
+        await users_collection.insert_one({
             'user_id': user_id,
             'email': email,
             'name': name,
             'picture': picture,
             'provider': 'google',
-            'created_at': now_iso
-        }
+            'created_at': now_iso,
+            'last_login_at': now_iso,
+        })
+        logger.info(f"New StumbleChat user created (google): {email}")
 
-        # Create session token (persisted to MongoDB)
-        session_token = secrets.token_urlsafe(32)
-        expires_at = datetime.now(timezone.utc) + timedelta(days=7)
+    users_db[user_id] = {
+        'user_id': user_id,
+        'email': email,
+        'name': name,
+        'picture': picture,
+        'provider': 'google',
+        'created_at': now_iso,
+    }
+    return user_id
 
-        session_doc = {
-            'session_token': session_token,
-            'user_id': user_id,
-            'email': email,
-            'name': name,
-            'picture': picture,
-            'expires_at': expires_at,
-            'created_at': datetime.now(timezone.utc)
-        }
-        await sessions_collection.insert_one(session_doc)
 
-        # In-memory cache for fast lookup
-        user_sessions[session_token] = {
-            'user_id': user_id,
-            'email': email,
-            'name': name,
-            'picture': picture,
-            'expires_at': expires_at.isoformat()
-        }
-        
-        # Send success message to opener window
-        user_data = {
-            'user_id': user_id,
-            'email': email,
-            'name': name,
-            'picture': picture,
-            'session_token': session_token
-        }
-        
-        import json
-        user_json = json.dumps(user_data)
-        
-        return Response(
-            content=f"""<html><body><script>
-                window.opener && window.opener.postMessage({{type:'google-auth-success', user:{user_json}}}, '{frontend_origin}');
-                window.close();
-            </script></body></html>""",
-            media_type="text/html"
-        )
-        
-    except Exception as e:
-        logger.error(f"Google OAuth error: {e}")
-        return Response(
-            content=f"""<html><body><script>
-                window.opener && window.opener.postMessage({{type:'google-auth-error', message:'Authentication failed'}}, '{frontend_origin}');
-                window.close();
-            </script></body></html>""",
-            media_type="text/html"
-        )
+async def _issue_session(user_id: str, email: str, name: str, picture: str) -> str:
+    """Create a new session token, persist it, cache it, and return the token."""
+    session_token = secrets.token_urlsafe(32)
+    expires_at = datetime.now(timezone.utc) + timedelta(days=7)
+    await sessions_collection.insert_one({
+        'session_token': session_token,
+        'user_id': user_id,
+        'email': email,
+        'name': name,
+        'picture': picture,
+        'expires_at': expires_at,
+        'created_at': datetime.now(timezone.utc),
+    })
+    user_sessions[session_token] = {
+        'user_id': user_id,
+        'email': email,
+        'name': name,
+        'picture': picture,
+        'expires_at': expires_at.isoformat(),
+    }
+    return session_token
+
+
+def _set_session_cookie(response: Response, session_token: str) -> None:
+    """Set an httpOnly, SameSite=None, Secure cookie carrying the session token."""
+    response.set_cookie(
+        key='session_token',
+        value=session_token,
+        max_age=7 * 24 * 60 * 60,  # 7 days
+        httponly=True,
+        secure=True,
+        samesite='none',
+        path='/',
+    )
+
 
 @app.get('/api/auth/me')
 async def get_current_user(request: Request):
@@ -519,7 +529,7 @@ async def email_send_otp(request: Request):
 
 @app.post('/api/auth/email/verify-otp')
 async def email_verify_otp(request: Request):
-    """Verify OTP, create/update user, and issue a session token."""
+    """Verify OTP, create/update user, and issue a session token. Sets an httpOnly cookie."""
     body = await request.json()
     email = (body.get('email') or '').strip().lower()
     code = (body.get('code') or '').strip()
@@ -529,6 +539,34 @@ async def email_verify_otp(request: Request):
         return Response(status_code=400, content='{"ok": false, "message": "Invalid input"}', media_type='application/json')
 
     otp_doc = await otp_collection.find_one({'email': email})
+    validation_error = await _validate_otp(otp_doc, email, code)
+    if validation_error is not None:
+        return validation_error
+
+    # Success — consume OTP
+    await otp_collection.delete_one({'email': email})
+
+    user_id = await _upsert_email_user(email, name)
+    session_token = await _issue_session(user_id, email, name, '')
+
+    body_json = {
+        'ok': True,
+        'user': {
+            'user_id': user_id,
+            'email': email,
+            'name': name,
+            'picture': '',
+            'session_token': session_token,
+        },
+    }
+    import json as _json
+    resp = Response(content=_json.dumps(body_json), media_type='application/json')
+    _set_session_cookie(resp, session_token)
+    return resp
+
+
+async def _validate_otp(otp_doc: Optional[dict], email: str, code: str) -> Optional[Response]:
+    """Return an error Response if OTP is missing/expired/over-limit/wrong; else None."""
     if not otp_doc:
         return Response(status_code=400, content='{"ok": false, "message": "No OTP requested"}', media_type='application/json')
 
@@ -548,10 +586,11 @@ async def email_verify_otp(request: Request):
         await otp_collection.update_one({'email': email}, {'$inc': {'attempts': 1}})
         return Response(status_code=400, content='{"ok": false, "message": "Invalid code"}', media_type='application/json')
 
-    # Success — consume OTP
-    await otp_collection.delete_one({'email': email})
+    return None
 
-    # Upsert user
+
+async def _upsert_email_user(email: str, name: str) -> str:
+    """Insert or update a user authenticated via email/OTP. Returns user_id."""
     existing = await users_collection.find_one({'email': email}, {'_id': 0})
     now_iso = datetime.now(timezone.utc).isoformat()
 
@@ -559,7 +598,7 @@ async def email_verify_otp(request: Request):
         user_id = existing['user_id']
         await users_collection.update_one(
             {'email': email},
-            {'$set': {'name': name, 'last_login_at': now_iso, 'provider': existing.get('provider', 'email')}}
+            {'$set': {'name': name, 'last_login_at': now_iso, 'provider': existing.get('provider', 'email')}},
         )
     else:
         user_id = f"user_{secrets.token_hex(6)}"
@@ -570,7 +609,7 @@ async def email_verify_otp(request: Request):
             'picture': '',
             'provider': 'email',
             'created_at': now_iso,
-            'last_login_at': now_iso
+            'last_login_at': now_iso,
         })
         logger.info(f"New StumbleChat user created (email): {email}")
 
@@ -580,39 +619,9 @@ async def email_verify_otp(request: Request):
         'name': name,
         'picture': '',
         'provider': 'email',
-        'created_at': now_iso
+        'created_at': now_iso,
     }
-
-    # Issue session
-    session_token = secrets.token_urlsafe(32)
-    expires_at_session = datetime.now(timezone.utc) + timedelta(days=7)
-    await sessions_collection.insert_one({
-        'session_token': session_token,
-        'user_id': user_id,
-        'email': email,
-        'name': name,
-        'picture': '',
-        'expires_at': expires_at_session,
-        'created_at': datetime.now(timezone.utc)
-    })
-    user_sessions[session_token] = {
-        'user_id': user_id,
-        'email': email,
-        'name': name,
-        'picture': '',
-        'expires_at': expires_at_session.isoformat()
-    }
-
-    return {
-        'ok': True,
-        'user': {
-            'user_id': user_id,
-            'email': email,
-            'name': name,
-            'picture': '',
-            'session_token': session_token
-        }
-    }
+    return user_id
 
 @app.get('/api/check-ip')
 async def check_ip_block(request: Request):
@@ -805,7 +814,7 @@ async def handle_register_user(sid, data):
         'age': age,
         'gender': gender,
         'city': city,
-        'emoji': random.choice(['😊', '😎', '🤗', '😺', '🦊', '🐼', '🦄', '🌟']),
+        'emoji': secrets.choice(['😊', '😎', '🤗', '😺', '🦊', '🐼', '🦄', '🌟']),
         'user_id': (auth_user or {}).get('user_id'),
         'email': (auth_user or {}).get('email'),
     }
@@ -1041,7 +1050,7 @@ async def handle_get_random_topic(sid, data):
         'What\'s your favorite way to spend a weekend?'
     ]
     
-    await sio.emit('random_topic', {'topic': random.choice(topics)}, room=sid)
+    await sio.emit('random_topic', {'topic': secrets.choice(topics)}, room=sid)
 
 @sio.on('report_user')
 async def handle_report_user(sid, data):

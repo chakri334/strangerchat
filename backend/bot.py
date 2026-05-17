@@ -11,6 +11,7 @@ Env var:  TELEGRAM_BOT_TOKEN
 
 import asyncio
 import os
+import secrets
 import random
 import logging
 import uuid as _uuid
@@ -495,7 +496,7 @@ async def _register_tg_user(chat_id: int, name: str) -> str:
     sid = tg_sid(chat_id)
     _full_cleanup(sid)
 
-    emoji = random.choice(EMOJIS)
+    emoji = secrets.choice(EMOJIS)
     active_connections[sid] = {
         'name':        name,
         'age':         '',

@@ -54,8 +54,8 @@ const CookiePolicy = () => {
                 </tr>
               </thead>
               <tbody>
-                {cookieTable.map((row, i) => (
-                  <tr key={i} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                {cookieTable.map((row) => (
+                  <tr key={row.name} className="border-b border-white/5 hover:bg-white/5 transition-colors">
                     <td className="px-4 py-3 text-[#7c5cfc] font-mono text-xs">{row.name}</td>
                     <td className="px-4 py-3 text-gray-300">{row.provider}</td>
                     <td className="px-4 py-3 text-gray-400 hidden sm:table-cell">{row.purpose}</td>

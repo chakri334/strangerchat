@@ -101,8 +101,8 @@ const Privacy = () => {
           <div key={title}>
             <h2 className="text-lg font-bold mb-3 text-white" style={{ fontFamily: 'Syne, sans-serif' }}>{title}</h2>
             <ul className="space-y-2">
-              {items.map((item, i) => (
-                <li key={i} className="flex gap-3 text-gray-300 leading-relaxed">
+              {items.map((item) => (
+                <li key={item} className="flex gap-3 text-gray-300 leading-relaxed">
                   <span className="text-[#7c5cfc] mt-1 flex-shrink-0">•</span>
                   <span>{item}</span>
                 </li>

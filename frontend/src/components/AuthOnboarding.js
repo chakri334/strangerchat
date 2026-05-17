@@ -15,20 +15,21 @@ const AuthOnboarding = ({ onAuthenticated }) => {
     const handleMessage = (event) => {
       if (event.data?.type === 'google-auth-success' && event.data?.user) {
         const user = event.data.user;
-        // Store user data
+        // Store non-sensitive user data
         localStorage.setItem('user', JSON.stringify(user));
         localStorage.setItem('authSession', JSON.stringify({
           mode: 'google',
           createdAt: Date.now(),
           email: user.email,
           name: user.name,
-          verified: true
+          verified: true,
         }));
         localStorage.setItem('authMethod', 'google');
         if (user.email) localStorage.setItem('accountEmail', user.email);
         if (user.name) localStorage.setItem('userName', user.name);
-        if (user.session_token) localStorage.setItem('session_token', user.session_token);
-        
+        // Auth token kept in sessionStorage only (cleared on tab close); httpOnly cookie is primary
+        if (user.session_token) sessionStorage.setItem('session_token', user.session_token);
+
         toast.success(`Welcome, ${user.name || 'User'}!`);
         setLoading(false);
         onAuthenticated();
@@ -149,6 +150,7 @@ const AuthOnboarding = ({ onAuthenticated }) => {
       const res = await fetch(`${BACKEND_URL}/api/auth/email/verify-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ email: normalized, code }),
       });
       const data = await res.json();
@@ -158,7 +160,7 @@ const AuthOnboarding = ({ onAuthenticated }) => {
       }
       const user = data.user;
       localStorage.setItem('user', JSON.stringify(user));
-      if (user.session_token) localStorage.setItem('session_token', user.session_token);
+      if (user.session_token) sessionStorage.setItem('session_token', user.session_token);
       if (user.name) localStorage.setItem('userName', user.name);
       toast.success('Email verified');
       finishSession('email', { email: user.email, name: user.name, verified: true });
