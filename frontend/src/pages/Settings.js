@@ -25,6 +25,8 @@ const Settings = () => {
   const [gender, setGender]           = useState('');
   const [city, setCity]               = useState('Global');
   const [genderLocked, setGenderLocked] = useState(false);
+  const [authMethod, setAuthMethod] = useState('email');
+  const [accountEmail, setAccountEmail] = useState('');
 
   useSEO({
     title: 'Settings',
@@ -39,11 +41,16 @@ const Settings = () => {
     setGender(localStorage.getItem('userGender') || '');
     setCity(localStorage.getItem('userCity') || 'Global');
     setGenderLocked(!!localStorage.getItem('userGender'));
+    setAuthMethod(localStorage.getItem('authMethod') || 'email');
+    setAccountEmail(localStorage.getItem('accountEmail') || '');
   }, []);
 
   const handleSave = () => {
     if (!name.trim()) { toast.error('Please enter a display name'); return; }
+    if (!accountEmail.trim()) { toast.error('Please enter your email'); return; }
     localStorage.setItem('userName', name.trim());
+    localStorage.setItem('authMethod', authMethod);
+    localStorage.setItem('accountEmail', accountEmail.trim());
     localStorage.setItem('userAge', age);
     localStorage.setItem('userCity', city);
     if (!genderLocked && gender) {
@@ -102,6 +109,23 @@ const Settings = () => {
 
 
 
+
+        {/* Account */}
+        <div>
+          <label className="block text-sm text-gray-400 mb-2">Create / Access Account</label>
+          <div className="grid grid-cols-2 gap-3 mb-3">
+            {['email', 'google'].map((method) => (
+              <button key={method} onClick={() => setAuthMethod(method)}
+                className={`py-3 rounded-xl font-medium transition-all ${authMethod === method ? 'bg-gradient-to-r from-[#7c5cfc] to-[#fc5c7d] text-white' : 'bg-white/5 text-gray-300 hover:bg-white/10'}`}>
+                {method === 'google' ? 'Google Account' : 'Email Account'}
+              </button>
+            ))}
+          </div>
+          <input type="email" value={accountEmail} onChange={(e) => setAccountEmail(e.target.value)}
+            placeholder={authMethod === 'google' ? 'Google email' : 'Email address'}
+            className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#7c5cfc] transition-all" />
+          <p className="text-xs text-gray-500 mt-2">Your selected account is saved on this device so you can access and use it later.</p>
+        </div>
         {/* Save */}
         <button onClick={handleSave} data-testid="save-button"
           className="w-full py-4 rounded-xl font-bold text-lg bg-gradient-to-r from-[#7c5cfc] to-[#fc5c7d] hover:opacity-90 transition-all">
