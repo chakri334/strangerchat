@@ -50,10 +50,18 @@ GOOGLE_REDIRECT_URI = os.environ.get('GOOGLE_REDIRECT_URI', '')
 # Photo tracking for disappearing photos
 photo_messages: Dict[str, dict] = {}  # photo_id -> {sender_sid, receiver_sid, opened, timer_started}
 
+# Trusted origins for Socket.IO CORS
+SOCKETIO_ALLOWED_ORIGINS = [
+    "https://stumblechat.online",
+    "https://www.stumblechat.online",
+    "https://socket-io-staging.preview.emergentagent.com",
+    "http://localhost:3000",
+]
+
 # Socket.IO server — strong connection config for mobile users
 sio = socketio.AsyncServer(
     async_mode='asgi',
-    cors_allowed_origins='*',
+    cors_allowed_origins=SOCKETIO_ALLOWED_ORIGINS,
     logger=False,
     engineio_logger=False,
     transports=['websocket', 'polling'],
@@ -104,11 +112,25 @@ app = FastAPI(lifespan=lifespan)
 GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
 GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "")
 GOOGLE_REDIRECT_URI = os.environ.get("GOOGLE_REDIRECT_URI", "")
-FRONTEND_URL = os.environ.get("FRONTEND_URL", "")
+
+# Trusted frontend origins for CORS and postMessage security
+ALLOWED_ORIGINS = [
+    "https://stumblechat.online",
+    "https://www.stumblechat.online",
+    "https://socket-io-staging.preview.emergentagent.com",
+    "http://localhost:3000",
+]
+
+# Add any additional origins from environment
+EXTRA_ORIGINS = os.environ.get("CORS_ORIGINS", "").split(",")
+for origin in EXTRA_ORIGINS:
+    origin = origin.strip()
+    if origin and origin != "*" and origin not in ALLOWED_ORIGINS:
+        ALLOWED_ORIGINS.append(origin)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=['*'],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=['*'],
     allow_headers=['*'],
@@ -177,6 +199,17 @@ async def google_auth_start(request: Request):
 async def google_auth_callback(request: Request, code: Optional[str] = None, state: Optional[str] = None, error: Optional[str] = None):
     """Handle Google OAuth callback"""
     
+    # Determine the trusted frontend origin for postMessage
+    # Only send to known trusted origins
+    frontend_origin = "https://stumblechat.online"  # Default to production
+    referer = request.headers.get('referer', '')
+    origin = request.headers.get('origin', '')
+    
+    for allowed in ALLOWED_ORIGINS:
+        if allowed in referer or allowed in origin:
+            frontend_origin = allowed
+            break
+    
     # Use configured GOOGLE_REDIRECT_URI if set (must match what was used in /start)
     if GOOGLE_REDIRECT_URI:
         redirect_uri = GOOGLE_REDIRECT_URI
@@ -190,7 +223,7 @@ async def google_auth_callback(request: Request, code: Optional[str] = None, sta
         logger.error(f"Google OAuth error: {error}")
         return Response(
             content=f"""<html><body><script>
-                window.opener && window.opener.postMessage({{type:'google-auth-error', message:'{error}'}}, '*');
+                window.opener && window.opener.postMessage({{type:'google-auth-error', message:'{error}'}}, '{frontend_origin}');
                 window.close();
             </script></body></html>""",
             media_type="text/html"
@@ -200,8 +233,8 @@ async def google_auth_callback(request: Request, code: Optional[str] = None, sta
     if not state or state not in google_auth_states:
         logger.error("Invalid or missing state parameter")
         return Response(
-            content="""<html><body><script>
-                window.opener && window.opener.postMessage({type:'google-auth-error', message:'Invalid state'}, '*');
+            content=f"""<html><body><script>
+                window.opener && window.opener.postMessage({{type:'google-auth-error', message:'Invalid state'}}, '{frontend_origin}');
                 window.close();
             </script></body></html>""",
             media_type="text/html"
@@ -212,8 +245,8 @@ async def google_auth_callback(request: Request, code: Optional[str] = None, sta
     
     if not code:
         return Response(
-            content="""<html><body><script>
-                window.opener && window.opener.postMessage({type:'google-auth-error', message:'No authorization code'}, '*');
+            content=f"""<html><body><script>
+                window.opener && window.opener.postMessage({{type:'google-auth-error', message:'No authorization code'}}, '{frontend_origin}');
                 window.close();
             </script></body></html>""",
             media_type="text/html"
@@ -310,7 +343,7 @@ async def google_auth_callback(request: Request, code: Optional[str] = None, sta
         
         return Response(
             content=f"""<html><body><script>
-                window.opener && window.opener.postMessage({{type:'google-auth-success', user:{user_json}}}, '*');
+                window.opener && window.opener.postMessage({{type:'google-auth-success', user:{user_json}}}, '{frontend_origin}');
                 window.close();
             </script></body></html>""",
             media_type="text/html"
@@ -319,8 +352,8 @@ async def google_auth_callback(request: Request, code: Optional[str] = None, sta
     except Exception as e:
         logger.error(f"Google OAuth error: {e}")
         return Response(
-            content="""<html><body><script>
-                window.opener && window.opener.postMessage({type:'google-auth-error', message:'Authentication failed'}, '*');
+            content=f"""<html><body><script>
+                window.opener && window.opener.postMessage({{type:'google-auth-error', message:'Authentication failed'}}, '{frontend_origin}');
                 window.close();
             </script></body></html>""",
             media_type="text/html"
@@ -846,10 +879,31 @@ async def try_match(city: str):
     await create_match(user1_sid, user2_sid)
 
 async def create_match(user1_sid: str, user2_sid: str):
-    print(f'[MATCH] Creating match between {user1_sid} and {user2_sid}', flush=True)
+    """Create a chat match between two users with validation"""
+    print(f'[MATCH] Attempting to create match between {user1_sid} and {user2_sid}', flush=True)
     
+    # Prevent self-matching
     if user1_sid == user2_sid:
-        return
+        print('[MATCH] Rejected: Cannot match user with themselves', flush=True)
+        return False
+    
+    # Validate both users are still connected
+    if user1_sid not in active_connections:
+        print(f'[MATCH] Rejected: User {user1_sid} no longer connected', flush=True)
+        return False
+    
+    if user2_sid not in active_connections:
+        print(f'[MATCH] Rejected: User {user2_sid} no longer connected', flush=True)
+        return False
+    
+    # Validate neither user is already in a room
+    if user1_sid in user_rooms:
+        print(f'[MATCH] Rejected: User {user1_sid} already in a room', flush=True)
+        return False
+    
+    if user2_sid in user_rooms:
+        print(f'[MATCH] Rejected: User {user2_sid} already in a room', flush=True)
+        return False
     
     room_id = str(uuid.uuid4())
     active_chats[room_id] = [user1_sid, user2_sid]
@@ -875,7 +929,8 @@ async def create_match(user1_sid: str, user2_sid: str):
         }
     }, room=user2_sid)
     
-    print(f'[MATCH] Matched {user1_sid} and {user2_sid} in room {room_id}', flush=True)
+    print(f'[MATCH] Successfully matched {user1_sid} and {user2_sid} in room {room_id}', flush=True)
+    return True
 
 async def try_global_match_after_delay(sid: str, delay: int):
     await asyncio.sleep(delay)
