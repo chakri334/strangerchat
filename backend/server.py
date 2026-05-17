@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 import socketio
 import os
@@ -12,6 +12,9 @@ from pathlib import Path
 import uuid
 import logging
 import time
+import secrets
+import requests
+from urllib.parse import urlencode
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -36,6 +39,8 @@ ip_report_count: Dict[str, int] = {}  # ip -> report_count
 
 # Photo tracking for disappearing photos
 photo_messages: Dict[str, dict] = {}  # photo_id -> {sender_sid, receiver_sid, opened, timer_started}
+google_auth_states: Dict[str, datetime] = {}
+google_users: Dict[str, dict] = {}
 
 # Socket.IO server — strong connection config for mobile users
 sio = socketio.AsyncServer(
@@ -88,6 +93,10 @@ async def lifespan(app_instance):
         logger.info("Telegram bot stopped")
 
 app = FastAPI(lifespan=lifespan)
+GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
+GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "")
+GOOGLE_REDIRECT_URI = os.environ.get("GOOGLE_REDIRECT_URI", "")
+FRONTEND_URL = os.environ.get("FRONTEND_URL", "")
 
 app.add_middleware(
     CORSMiddleware,
@@ -110,6 +119,51 @@ async def health_check():
 @app.get('/api/')
 async def root():
     return {'message': 'Chat server running'}
+
+@app.get('/api/auth/google/start')
+async def google_auth_start():
+    if not GOOGLE_CLIENT_ID or not GOOGLE_REDIRECT_URI:
+        return {'ok': False, 'message': 'Google auth is not configured'}
+    state = secrets.token_urlsafe(24)
+    google_auth_states[state] = datetime.now(timezone.utc)
+    query = urlencode({
+        'client_id': GOOGLE_CLIENT_ID,
+        'redirect_uri': GOOGLE_REDIRECT_URI,
+        'response_type': 'code',
+        'scope': 'openid email profile',
+        'state': state,
+        'prompt': 'select_account',
+        'access_type': 'offline'
+    })
+    return {'ok': True, 'auth_url': f'https://accounts.google.com/o/oauth2/v2/auth?{query}', 'state': state}
+
+@app.get('/api/auth/google/callback')
+async def google_auth_callback(code: Optional[str] = None, state: Optional[str] = None):
+    if not code or not state or state not in google_auth_states:
+        return Response(content="<script>window.opener&&window.opener.postMessage({type:'google-auth-error',message:'Invalid callback'},'*');window.close();</script>", media_type="text/html")
+    del google_auth_states[state]
+    if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET or not GOOGLE_REDIRECT_URI:
+        return Response(content="<script>window.opener&&window.opener.postMessage({type:'google-auth-error',message:'Google auth misconfigured'},'*');window.close();</script>", media_type="text/html")
+    try:
+        token_resp = requests.post('https://oauth2.googleapis.com/token', data={
+            'code': code,
+            'client_id': GOOGLE_CLIENT_ID,
+            'client_secret': GOOGLE_CLIENT_SECRET,
+            'redirect_uri': GOOGLE_REDIRECT_URI,
+            'grant_type': 'authorization_code'
+        }, timeout=8)
+        token_data = token_resp.json()
+        access_token = token_data.get('access_token')
+        if not access_token:
+            raise ValueError('Token exchange failed')
+        profile_resp = requests.get('https://www.googleapis.com/oauth2/v3/userinfo', headers={'Authorization': f'Bearer {access_token}'}, timeout=8)
+        profile = profile_resp.json()
+        email = (profile.get('email') or '').strip().lower()
+        google_users[email] = {'email': email, 'name': profile.get('name', ''), 'picture': profile.get('picture', '')}
+        payload = {'type': 'google-auth-success', 'session': {'mode': 'google', 'email': email, 'name': profile.get('name', ''), 'avatar': profile.get('picture', ''), 'verified': True}}
+        return Response(content=f"<script>window.opener&&window.opener.postMessage({payload},'*');window.close();</script>", media_type="text/html")
+    except Exception:
+        return Response(content="<script>window.opener&&window.opener.postMessage({type:'google-auth-error',message:'Google authentication failed'},'*');window.close();</script>", media_type="text/html")
 
 @app.get('/api/check-ip')
 async def check_ip_block(request: Request):
