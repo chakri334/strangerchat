@@ -27,6 +27,7 @@ const Home = () => {
   const [userName, setUserName] = useState('');
   const [userAge, setUserAge] = useState('');
   const [userGender, setUserGender] = useState('');
+  const [nearbyUsers, setNearbyUsers] = useState([]);
   const [photoToView, setPhotoToView] = useState(null);
   const [isBlocked, setIsBlocked] = useState(false);
   const [blockMessage, setBlockMessage] = useState('');
@@ -124,6 +125,7 @@ const Home = () => {
     
     // Detect location
     detectUserLocation();
+    loadNearbyUsers(savedCity);
     
     newSocket.on('connect', () => {
       console.log('✓ Connected to server');
@@ -207,6 +209,7 @@ const Home = () => {
     });
     
     newSocket.on('stats_update', (data) => {
+      if (savedGender === 'Male') loadNearbyUsers(savedCity);
       console.log('Stats updated:', data);
       setStats(data);
     });
@@ -271,6 +274,27 @@ const Home = () => {
     };
   }, []);
   
+  const loadNearbyUsers = async (city) => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/active-users?city=${encodeURIComponent(city || 'Global')}`);
+      const data = await res.json();
+      const mySid = socketRef.current?.id;
+      setNearbyUsers((data.users || []).filter((u) => u.sid !== mySid));
+    } catch (e) {
+      console.log('Failed to load nearby users');
+    }
+  };
+
+  const handleDirectChat = (targetSid) => {
+    if (!socket || !socket.connected) {
+      toast.error('Not connected yet');
+      return;
+    }
+    setIsSearchingSync(true);
+    socket.emit('join_queue', { city: userCity, target_sid: targetSid });
+    toast.info('Connecting you to selected user...');
+  };
+
   const handleConnect = () => {
     if (!socket) {
       toast.error('Please wait, initializing...');
@@ -455,6 +479,28 @@ const Home = () => {
         </header>
         
         {/* Location detection happens in background - no UI shown */}
+        {userGender === 'Male' && (
+          <div className="px-6">
+            <div className="max-w-2xl mx-auto bg-white/5 rounded-2xl p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="font-bold">Nearby Active Users</h2>
+                <button onClick={() => loadNearbyUsers(userCity)} className="text-xs text-gray-300 hover:text-white">Refresh</button>
+              </div>
+              <div className="space-y-2 max-h-60 overflow-auto">
+                {nearbyUsers.length === 0 ? (
+                  <p className="text-sm text-gray-400">No nearby active users yet. Try refresh in a moment.</p>
+                ) : nearbyUsers.map((u) => (
+                  <button key={u.sid} onClick={() => handleDirectChat(u.sid)} className="w-full text-left bg-white/5 hover:bg-white/10 rounded-xl p-3 transition-all">
+                    <div className="font-medium">{u.emoji} {u.name}</div>
+                    <div className="text-xs text-gray-400">{u.city} {u.age ? `• ${u.age}` : ''}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+
         
         {/* Connect Button */}
         <div className="flex-1 flex items-center justify-center px-6 py-12">

@@ -150,6 +150,23 @@ async def get_stats():
         'city_counts': city_users
     }
 
+@app.get('/api/active-users')
+async def get_active_users(city: Optional[str] = None):
+    users = []
+    for sid, user in active_connections.items():
+        user_city = user.get('city', 'Global')
+        if city and city != 'Global' and user_city != city:
+            continue
+        users.append({
+            'sid': sid,
+            'name': user.get('name', 'Anonymous'),
+            'age': user.get('age', ''),
+            'gender': user.get('gender', ''),
+            'city': user_city,
+            'emoji': user.get('emoji', '😊')
+        })
+    return {'users': users, 'count': len(users)}
+
 # Socket.IO events
 @sio.event
 async def connect(sid, environ):
@@ -246,6 +263,7 @@ async def handle_register_user(sid, data):
 async def handle_join_queue(sid, data):
     print(f'[SOCKET] join_queue event received from {sid}', flush=True)
     city = data.get('city', 'Unknown')
+    target_sid = data.get('target_sid')
     
     print(f'[SOCKET] User {sid} joining queue for {city}', flush=True)
     
@@ -256,6 +274,10 @@ async def handle_join_queue(sid, data):
     
     if sid in user_rooms:
         print(f'[SOCKET] User {sid} already in a chat, cannot join queue', flush=True)
+        return
+
+    if target_sid and target_sid in active_connections and target_sid != sid and target_sid not in user_rooms:
+        await create_match(sid, target_sid)
         return
     
     active_connections[sid]['city'] = city
