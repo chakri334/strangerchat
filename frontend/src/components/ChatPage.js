@@ -220,6 +220,15 @@ const ChatPage = ({ socket, partner, onClose, onSkip }) => {
     e.preventDefault();
     
     if (!inputMessage.trim()) return;
+    const authSession = JSON.parse(localStorage.getItem('authSession') || '{}');
+    if (authSession.mode === 'guest') {
+      const count = Number(localStorage.getItem('guestMessageCount') || '0');
+      if (count >= 20) {
+        toast.error('Guest message limit reached. Upgrade account in Settings.');
+        return;
+      }
+      localStorage.setItem('guestMessageCount', String(count + 1));
+    }
     
     console.log('📤 Sending message:', inputMessage);
     
@@ -239,6 +248,11 @@ const ChatPage = ({ socket, partner, onClose, onSkip }) => {
   };
   
   const handlePhotoUpload = (e) => {
+    const authSession = JSON.parse(localStorage.getItem('authSession') || '{}');
+    if (authSession.mode === 'guest') {
+      toast.error('Guest mode cannot upload media. Upgrade account in Settings.');
+      return;
+    }
     const file = e.target.files[0];
     if (!file) return;
     

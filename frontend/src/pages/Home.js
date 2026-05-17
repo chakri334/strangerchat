@@ -8,6 +8,7 @@ import { Settings as SettingsIcon } from 'lucide-react';
 import { Analytics } from '../utils/analytics';
 import { setGeoTitle, trackCitySearch, trackGeoMatch } from '../utils/seo';
 import OnboardingModal from '../components/OnboardingModal';
+import AuthOnboarding from '../components/AuthOnboarding';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -35,6 +36,7 @@ const Home = () => {
   const [showOnboarding, setShowOnboarding] = useState(
     () => !localStorage.getItem('hasSeenOnboarding')
   );
+  const [isAuthed, setIsAuthed] = useState(() => !!localStorage.getItem('authSession'));
   const socketRef = useRef(null);
   const searchTimerRef = useRef(null);   // tracks the active search timeout
   const searchCountRef = useRef(0);      // prevents stale closure bug on isSearching
@@ -411,6 +413,10 @@ const Home = () => {
 
   // Show waiting page when searching
   // Show onboarding on first visit
+  if (!isAuthed) {
+    return <AuthOnboarding onAuthenticated={() => setIsAuthed(true)} />;
+  }
+
   if (showOnboarding) {
     return <OnboardingModal onAccept={() => setShowOnboarding(false)} />;
   }
@@ -469,13 +475,24 @@ const Home = () => {
               </p>
             </div>
           </div>
-          <button
-            onClick={() => navigate('/settings')}
-            className="p-3 rounded-full bg-white/5 hover:bg-white/10 transition-colors"
-            data-testid="settings-button"
-          >
-            <SettingsIcon size={20} />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                localStorage.removeItem('authSession');
+                setIsAuthed(false);
+              }}
+              className="px-3 py-2 rounded-full bg-white/5 hover:bg-white/10 transition-colors text-xs text-gray-300"
+            >
+              Logout
+            </button>
+            <button
+              onClick={() => navigate('/settings')}
+              className="p-3 rounded-full bg-white/5 hover:bg-white/10 transition-colors"
+              data-testid="settings-button"
+            >
+              <SettingsIcon size={20} />
+            </button>
+          </div>
         </header>
         
         {/* Location detection happens in background - no UI shown */}
