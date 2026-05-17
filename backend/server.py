@@ -1023,18 +1023,6 @@ async def handle_leave_queue(sid, data=None):
                 del waiting_queue[city]
     await sio.emit('queue_left', {}, room=sid)
 
-@sio.on('audio_signal')
-async def handle_audio_signal(sid, data):
-    if sid not in user_rooms:
-        return
-    
-    room_id = user_rooms[sid]
-    
-    if room_id in active_chats:
-        partner_sid = [s for s in active_chats[room_id] if s != sid]
-        if partner_sid:
-            await sio.emit('audio_signal', data, room=partner_sid[0])
-
 @sio.on('get_random_topic')
 async def handle_get_random_topic(sid, data):
     topics = [
