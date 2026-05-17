@@ -133,10 +133,21 @@ async def root():
 # ============================================
 
 @app.get('/api/auth/google/start')
-async def google_auth_start():
+async def google_auth_start(request: Request):
     """Start Google OAuth flow - returns URL to redirect user to"""
-    if not GOOGLE_CLIENT_ID or not GOOGLE_REDIRECT_URI:
+    if not GOOGLE_CLIENT_ID:
         return {'ok': False, 'message': 'Google OAuth not configured'}
+    
+    # Dynamically determine redirect URI based on request origin
+    # This allows testing on preview while production uses the configured URI
+    host = request.headers.get('host', '')
+    scheme = request.headers.get('x-forwarded-proto', 'https')
+    
+    # Use configured URI for production, dynamic for preview/dev
+    if 'stumblechat.online' in host:
+        redirect_uri = GOOGLE_REDIRECT_URI or f"{scheme}://{host}/api/auth/google/callback"
+    else:
+        redirect_uri = f"{scheme}://{host}/api/auth/google/callback"
     
     # Generate CSRF state token
     state = secrets.token_urlsafe(32)
@@ -151,7 +162,7 @@ async def google_auth_start():
     # Build Google OAuth URL
     params = {
         'client_id': GOOGLE_CLIENT_ID,
-        'redirect_uri': GOOGLE_REDIRECT_URI,
+        'redirect_uri': redirect_uri,
         'response_type': 'code',
         'scope': 'openid email profile',
         'state': state,
@@ -160,11 +171,22 @@ async def google_auth_start():
     }
     auth_url = f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(params)}"
     
+    logger.info(f"Google OAuth started with redirect_uri: {redirect_uri}")
+    
     return {'ok': True, 'auth_url': auth_url, 'state': state}
 
 @app.get('/api/auth/google/callback')
-async def google_auth_callback(code: Optional[str] = None, state: Optional[str] = None, error: Optional[str] = None):
+async def google_auth_callback(request: Request, code: Optional[str] = None, state: Optional[str] = None, error: Optional[str] = None):
     """Handle Google OAuth callback"""
+    
+    # Dynamically determine redirect URI (must match what was used in /start)
+    host = request.headers.get('host', '')
+    scheme = request.headers.get('x-forwarded-proto', 'https')
+    
+    if 'stumblechat.online' in host:
+        redirect_uri = GOOGLE_REDIRECT_URI or f"{scheme}://{host}/api/auth/google/callback"
+    else:
+        redirect_uri = f"{scheme}://{host}/api/auth/google/callback"
     
     # Handle errors from Google
     if error:
@@ -208,7 +230,7 @@ async def google_auth_callback(code: Optional[str] = None, state: Optional[str] 
                 'code': code,
                 'client_id': GOOGLE_CLIENT_ID,
                 'client_secret': GOOGLE_CLIENT_SECRET,
-                'redirect_uri': GOOGLE_REDIRECT_URI,
+                'redirect_uri': redirect_uri,
                 'grant_type': 'authorization_code'
             },
             timeout=10
