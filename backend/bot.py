@@ -348,6 +348,13 @@ async def _handle_tg_event(chat_id: int, sid: str, event: str, data: dict):
             InlineKeyboardButton("⏭ Skip",       callback_data="skip"),
             InlineKeyboardButton("🚫 Stop",       callback_data="disconnect"),
             InlineKeyboardButton("🚩 Report",     callback_data="report"),
+        keyboard = InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("⏭ Skip",       callback_data="skip"),
+                InlineKeyboardButton("🚫 Stop",       callback_data="disconnect"),
+                InlineKeyboardButton("🚩 Report",     callback_data="report"),
+            ],
+            [InlineKeyboardButton("🌐 Go to Stumble chat online", url=WEB_APP_URL)]
         ]])
         await tg_send(
             chat_id,
@@ -376,6 +383,7 @@ async def _handle_tg_event(chat_id: int, sid: str, event: str, data: dict):
         photo_id = data.get('photo_id', '')
         keyboard = InlineKeyboardMarkup([[
             InlineKeyboardButton("📷 View on Stumble Chat", url="https://stumblechat.online"),
+            InlineKeyboardButton("🌐 Go to Stumble chat online", url=WEB_APP_URL),
         ]])
         await tg_send(
             chat_id,
@@ -412,6 +420,7 @@ async def _handle_tg_event(chat_id: int, sid: str, event: str, data: dict):
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("🔍 Find new stranger", callback_data="connect")],
             [InlineKeyboardButton("🌐 Go to Web App", url=WEB_APP_URL)],
+            [InlineKeyboardButton("🌐 Go to Stumble chat online", url=WEB_APP_URL)],
         ])
         await tg_send(
             chat_id,
@@ -429,6 +438,7 @@ async def _handle_tg_event(chat_id: int, sid: str, event: str, data: dict):
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("🔍 Find new stranger", callback_data="connect")],
             [InlineKeyboardButton("🌐 Go to Web App", url=WEB_APP_URL)],
+            [InlineKeyboardButton("🌐 Go to Stumble chat online", url=WEB_APP_URL)],
         ])
         await tg_send(chat_id, "Chat ended. /connect to find someone new.", reply_markup=keyboard)
         _remove_from_chat(sid)
@@ -559,6 +569,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("🔍 Find a Stranger", callback_data="connect")],
         [InlineKeyboardButton("🌐 Go to Web App", url=WEB_APP_URL)],
+        [InlineKeyboardButton("🌐 Go to Stumble chat online", url=WEB_APP_URL)],
     ])
     await tg_send(
         chat_id,
@@ -571,7 +582,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"<b>Commands:</b>\n"
         f"/connect – Find a stranger\n"
         f"/skip    – Skip to next person\n"
-        f"/webapp  – Open the web app\n"
+        f"/StumbleChatOnline  – Open the web app\n"
         f"/stop    – Disconnect\n"
         f"/report  – Report current partner\n"
         f"/help    – Help",
@@ -635,6 +646,7 @@ async def cmd_stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("🔍 Find a new stranger", callback_data="connect")],
         [InlineKeyboardButton("🌐 Go to Web App", url=WEB_APP_URL)],
+        [InlineKeyboardButton("🌐 Go to Stumble chat online", url=WEB_APP_URL)],
     ])
     await tg_send(
         chat_id,
@@ -698,7 +710,7 @@ async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def cmd_webapp(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Send the web app URL to the user."""
     keyboard = InlineKeyboardMarkup([[
-        InlineKeyboardButton("🌐 Open Stumble Chat", url=WEB_APP_URL)
+        InlineKeyboardButton("🌐 Go to Stumble chat online", url=WEB_APP_URL)
     ]])
     await tg_send(
         update.effective_chat.id,
@@ -714,7 +726,7 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/skip    – Skip to next stranger\n"
         "/stop    – Disconnect\n"
         "/report  – Report current partner\n"
-        "/webapp  – Open the web app\n"
+        "/StumbleChatOnline  – Open the web app\n"
         "/sticker – Get our sticker to share\n"
         "/help    – Show this message\n\n"
         "💬 Type normally to send messages when connected.\n"
@@ -821,6 +833,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if sid not in user_rooms:
         keyboard = InlineKeyboardMarkup([[
             InlineKeyboardButton("🔍 Find a stranger", callback_data="connect"),
+            InlineKeyboardButton("🌐 Go to Stumble chat online", url=WEB_APP_URL),
         ]])
         await tg_send(chat_id, "You're not connected to anyone yet.", reply_markup=keyboard)
         return
@@ -960,6 +973,7 @@ async def _reengagement_loop():
                         keyboard = InlineKeyboardMarkup([
                             [InlineKeyboardButton("Find a Stranger", callback_data="connect")],
                             [InlineKeyboardButton("🌐 Go to Web App", url=WEB_APP_URL)],
+                            [InlineKeyboardButton("🌐 Go to Stumble chat online", url=WEB_APP_URL)],
                         ])
                         await tg_send(
                             chat_id,
@@ -993,7 +1007,7 @@ def create_bot_app() -> Application:
     application.add_handler(CommandHandler("skip",    cmd_skip))
     application.add_handler(CommandHandler("stop",    cmd_stop))
     application.add_handler(CommandHandler("report",  cmd_report))
-    application.add_handler(CommandHandler("webapp",  cmd_webapp))
+    application.add_handler(CommandHandler("StumbleChatOnline",  cmd_webapp))
     application.add_handler(CommandHandler("help",    cmd_help))
     application.add_handler(CommandHandler("sticker",  cmd_sticker))
     application.add_handler(MessageHandler(filters.PHOTO, handle_photo))
