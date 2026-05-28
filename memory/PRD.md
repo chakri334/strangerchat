@@ -1,7 +1,24 @@
 # Stumble Chat - Product Requirements Document
 
 ## Original Problem Statement
-Build a full-stack anonymous stranger chat web app named "Stumble Chat" with real-time text and audio chat capabilities, photo sharing with auto-disappearing feature, and user safety features.
+Build a full-stack anonymous stranger chat web app named "Stumble Chat" with real-time text chat (audio CANCELLED), disappearing-photo sharing, Google OAuth + email OTP sign-in, user reporting with IP banning, Telegram admin bot, GA4 analytics, and persistent user/report storage in MongoDB.
+
+## Recent Changes (Feb 2026)
+- **Comprehensive code-quality pass (Feb 17 2026):**
+  - Backend: refactored `google_auth_callback` and `email_verify_otp` into small helpers (`_resolve_trusted_origin`, `_oauth_popup_success/_error`, `_exchange_code_for_profile`, `_upsert_user_from_google`, `_issue_session`, `_set_session_cookie`, `_validate_otp`, `_upsert_email_user`).
+  - Backend: switched non-deterministic security choices to `secrets.choice` (emoji + random topic) in server.py and bot.py.
+  - Backend: `_set_session_cookie` sets `HttpOnly; Secure; SameSite=None` cookie on Google OAuth + email OTP success. `/api/auth/me` accepts cookie or Bearer.
+  - Backend: removed dead `audio_signal` Socket.IO handler (audio feature cancelled).
+  - Frontend: deleted dead `ChatModal.js` and all SimplePeer/audio references.
+  - Frontend: split `ChatPage.js` (642 → ~210 lines) into `chat/ChatHeader`, `chat/MessageList`, `chat/ChatInput`, `chat/ReportModal`, `chat/DisconnectedFooter`.
+  - Frontend: split `Home.js` (594 → ~270 lines) into `home/HomeHeader`, `home/BlockedScreen`, `home/NearbyUsersPanel`, `home/ConnectHero`, `home/StatsBar`.
+  - Frontend: fixed React hook deps using `useCallback` across `AuthContext`, `Home`, `ChatPage`; replaced stale `userCity` closure with `userCityRef`.
+  - Frontend: migrated `session_token` from `localStorage` to `sessionStorage` (auth token never touches persistent storage; httpOnly cookie is primary).
+  - Frontend: removed array-index keys in `Privacy.js`, `CookiePolicy.js`.
+  - Frontend: replaced nested ternary in Connect button label with `buttonLabel()` helper.
+- **MongoDB persistence (Feb 17 2026):** users, sessions, reports, email OTPs collections with proper indexes + TTL.
+- **Email OTP backend endpoints:** `POST /api/auth/email/send-otp`, `POST /api/auth/email/verify-otp`. ⚠️ Email delivery still MOCKED (returns `dev_code`).
+- **Admin endpoints:** `GET /api/admin/users`, `GET /api/admin/reports` protected by `x-admin-token`.
 
 ## Product Overview
 Stumble Chat is an anonymous, real-time chat application that connects random users for conversation. The app prioritizes user privacy and safety while providing an engaging chat experience.
