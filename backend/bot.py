@@ -10,6 +10,7 @@ Env var:  TELEGRAM_BOT_TOKEN
 """
 
 import asyncio
+import html
 import os
 import secrets
 import random
@@ -99,6 +100,10 @@ application: Application = None  # type: ignore
 
 def tg_sid(chat_id: int) -> str:
     return f"tg_{chat_id}"
+
+
+def html_escape(value) -> str:
+    return html.escape(str(value), quote=False)
 
 
 def touch_user(chat_id: int, name: str = "Stranger"):
@@ -341,13 +346,9 @@ async def _handle_tg_event(chat_id: int, sid: str, event: str, data: dict):
     # ── Matched ───────────────────────────────────────────────────────────────
     if event == 'match_found':
         partner = data.get('partner', {})
-        name    = partner.get('name', 'Stranger')
-        emoji   = partner.get('emoji', '😊')
+        name    = html_escape(partner.get('name', 'Stranger'))
+        emoji   = html_escape(partner.get('emoji', '😊'))
         await track(chat_id, 'match_found')
-        keyboard = InlineKeyboardMarkup([[
-            InlineKeyboardButton("⏭ Skip",       callback_data="skip"),
-            InlineKeyboardButton("🚫 Stop",       callback_data="disconnect"),
-            InlineKeyboardButton("🚩 Report",     callback_data="report"),
         keyboard = InlineKeyboardMarkup([
             [
                 InlineKeyboardButton("⏭ Skip",       callback_data="skip"),
@@ -355,7 +356,7 @@ async def _handle_tg_event(chat_id: int, sid: str, event: str, data: dict):
                 InlineKeyboardButton("🚩 Report",     callback_data="report"),
             ],
             [InlineKeyboardButton("🌐 Go to Stumble chat online", url=WEB_APP_URL)]
-        ]])
+        ])
         await tg_send(
             chat_id,
             f"🎉 <b>Connected with {emoji} {name}!</b>\n\n"
@@ -368,11 +369,11 @@ async def _handle_tg_event(chat_id: int, sid: str, event: str, data: dict):
     # server.py sends {'message', 'timestamp', 'from':'partner'} with no name.
     # We look up the real name from active_connections directly.
     elif event == 'new_message':
-        msg          = data.get('message', '')
+        msg          = html_escape(data.get('message', ''))
         partner_data = _get_partner_data(sid)
         sender       = data.get('sender') or partner_data  # TG→TG includes sender
-        name         = sender.get('name', 'Stranger')
-        emoji        = sender.get('emoji', '💬')
+        name         = html_escape(sender.get('name', 'Stranger'))
+        emoji        = html_escape(sender.get('emoji', '💬'))
         await track(chat_id, 'message_received')
         await tg_send(chat_id, f"{emoji} <b>{name}:</b> {msg}")
 
@@ -446,7 +447,7 @@ async def _handle_tg_event(chat_id: int, sid: str, event: str, data: dict):
 
     # ── Error (includes block notification) ──────────────────────────────────
     elif event == 'error':
-        msg = data.get('message', 'Something went wrong.')
+        msg = html_escape(data.get('message', 'Something went wrong.'))
         await tg_send(chat_id, f"⚠️ {msg}")
 
     # ── Ignored events (UI-only / not applicable on Telegram) ────────────────
@@ -565,6 +566,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await _register_tg_user(chat_id, name)
     await track(chat_id, 'session_start')
     touch_user(chat_id, name)
+    safe_name = html_escape(name)
 
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("🔍 Find a Stranger", callback_data="connect")],
@@ -573,7 +575,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ])
     await tg_send(
         chat_id,
-        f"👋 <b>Welcome to Stumble Chat, {name}!</b>\n\n"
+        f"👋 <b>Welcome to Stumble Chat, {safe_name}!</b>\n\n"
         f"Connect with random strangers worldwide — anonymously, for free.\n\n"
         f"⚠️ <b>You must be 18+ to use this service.</b>\n"
         f"By continuing you agree to our "
@@ -685,8 +687,9 @@ async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
         'chat_history': [],
     })
 
-    ip_report_count[reported_ip] = ip_report_count.get(reported_ip, 0) + 1
-    if ip_report_count[reported_ip] >= 3:
+    if reported_ip != 'unknown':
+        ip_report_count[reported_ip] = ip_report_count.get(reported_ip, 0) + 1
+    if reported_ip != 'unknown' and ip_report_count[reported_ip] >= 3:
         ip_blocks[reported_ip] = datetime.now(timezone.utc) + timedelta(days=3)
         await _original_emit(
             'error',
@@ -967,7 +970,7 @@ async def _reengagement_loop():
                         continue
 
                     total_waiting = sum(len(v) for v in waiting_queue.values())
-                    name = info.get("name", "there")
+                    name = html_escape(info.get("name", "there"))
 
                     try:
                         keyboard = InlineKeyboardMarkup([
