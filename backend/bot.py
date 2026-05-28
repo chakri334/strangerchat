@@ -432,7 +432,6 @@ async def _handle_tg_event(chat_id: int, sid: str, event: str, data: dict):
             user_registry[chat_id]["chat_count"] = user_registry[chat_id].get("chat_count", 0) + 1
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("🔍 Find new stranger", callback_data="connect")],
-            [InlineKeyboardButton("🌐 Go to Web App", url=WEB_APP_URL)],
             [InlineKeyboardButton("🌐 Go to Stumble chat online", url=WEB_APP_URL)],
         ])
         await tg_send(
@@ -450,7 +449,6 @@ async def _handle_tg_event(chat_id: int, sid: str, event: str, data: dict):
             user_registry[chat_id]["chat_count"] = user_registry[chat_id].get("chat_count", 0) + 1
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("🔍 Find new stranger", callback_data="connect")],
-            [InlineKeyboardButton("🌐 Go to Web App", url=WEB_APP_URL)],
             [InlineKeyboardButton("🌐 Go to Stumble chat online", url=WEB_APP_URL)],
         ])
         await tg_send(chat_id, "Chat ended. /connect to find someone new.", reply_markup=keyboard)
@@ -582,7 +580,6 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("🔍 Find a Stranger", callback_data="connect")],
-        [InlineKeyboardButton("🌐 Go to Web App", url=WEB_APP_URL)],
         [InlineKeyboardButton("🌐 Go to Stumble chat online", url=WEB_APP_URL)],
     ])
     await tg_send(
@@ -659,7 +656,6 @@ async def cmd_stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("🔍 Find a new stranger", callback_data="connect")],
-        [InlineKeyboardButton("🌐 Go to Web App", url=WEB_APP_URL)],
         [InlineKeyboardButton("🌐 Go to Stumble chat online", url=WEB_APP_URL)],
     ])
     await tg_send(
@@ -987,7 +983,6 @@ async def _reengagement_loop():
                     try:
                         keyboard = InlineKeyboardMarkup([
                             [InlineKeyboardButton("Find a Stranger", callback_data="connect")],
-                            [InlineKeyboardButton("🌐 Go to Web App", url=WEB_APP_URL)],
                             [InlineKeyboardButton("🌐 Go to Stumble chat online", url=WEB_APP_URL)],
                         ])
                         await tg_send(
