@@ -60,6 +60,8 @@ BOT_USERNAME = os.environ.get("BOT_USERNAME", "StumbleChatBot")  # set in Emerge
 _PROMO_STICKER_FILE_ID: str = ""
 EMOJIS    = ['😊', '😎', '🤗', '😺', '🦊', '🐼', '🦄', '🌟']
 
+WEB_APP_URL = "https://stumblechat.online"
+
 # ── PostHog server-side analytics ────────────────────────────────────────────
 POSTHOG_KEY = 'phc_xAvL2Iq4tFmANRE7kzbKwaSqp1HJjN7x48s3vr0CMjs'
 POSTHOG_URL = 'https://us.i.posthog.com/capture/'
@@ -400,9 +402,10 @@ async def _handle_tg_event(chat_id: int, sid: str, event: str, data: dict):
         # Increment chat count
         if chat_id in user_registry:
             user_registry[chat_id]["chat_count"] = user_registry[chat_id].get("chat_count", 0) + 1
-        keyboard = InlineKeyboardMarkup([[
-            InlineKeyboardButton("🔍 Find new stranger", callback_data="connect"),
-        ]])
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔍 Find new stranger", callback_data="connect")],
+            [InlineKeyboardButton("🌐 Go to Web App", url=WEB_APP_URL)],
+        ])
         await tg_send(
             chat_id,
             "👋 <b>Your partner disconnected.</b>\n\nTap below or /connect to chat again.",
@@ -416,9 +419,10 @@ async def _handle_tg_event(chat_id: int, sid: str, event: str, data: dict):
         # Increment chat count
         if chat_id in user_registry:
             user_registry[chat_id]["chat_count"] = user_registry[chat_id].get("chat_count", 0) + 1
-        keyboard = InlineKeyboardMarkup([[
-            InlineKeyboardButton("🔍 Find new stranger", callback_data="connect"),
-        ]])
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔍 Find new stranger", callback_data="connect")],
+            [InlineKeyboardButton("🌐 Go to Web App", url=WEB_APP_URL)],
+        ])
         await tg_send(chat_id, "Chat ended. /connect to find someone new.", reply_markup=keyboard)
         _remove_from_chat(sid)
         await _maybe_send_promo_sticker(chat_id)
@@ -545,9 +549,10 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await track(chat_id, 'session_start')
     touch_user(chat_id, name)
 
-    keyboard = InlineKeyboardMarkup([[
-        InlineKeyboardButton("🔍 Find a Stranger", callback_data="connect"),
-    ]])
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🔍 Find a Stranger", callback_data="connect")],
+        [InlineKeyboardButton("🌐 Go to Web App", url=WEB_APP_URL)],
+    ])
     await tg_send(
         chat_id,
         f"👋 <b>Welcome to Stumble Chat, {name}!</b>\n\n"
@@ -559,6 +564,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"<b>Commands:</b>\n"
         f"/connect – Find a stranger\n"
         f"/skip    – Skip to next person\n"
+        f"/webapp  – Open the web app\n"
         f"/stop    – Disconnect\n"
         f"/report  – Report current partner\n"
         f"/help    – Help",
@@ -619,9 +625,10 @@ async def cmd_stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Re-register so /connect works immediately without /start
     await _register_tg_user(chat_id, saved_name)
 
-    keyboard = InlineKeyboardMarkup([[
-        InlineKeyboardButton("🔍 Find a new stranger", callback_data="connect"),
-    ]])
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🔍 Find a new stranger", callback_data="connect")],
+        [InlineKeyboardButton("🌐 Go to Web App", url=WEB_APP_URL)],
+    ])
     await tg_send(
         chat_id,
         "👋 <b>Disconnected.</b>\n\nSend /connect whenever you want to chat again.",
@@ -681,6 +688,17 @@ async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await cmd_skip(update, context)
 
 
+async def cmd_webapp(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Send the web app URL to the user."""
+    keyboard = InlineKeyboardMarkup([[
+        InlineKeyboardButton("🌐 Open Stumble Chat", url=WEB_APP_URL)
+    ]])
+    await tg_send(
+        update.effective_chat.id,
+        "Prefer the full experience? Click below to open the Stumble Chat web app.",
+        reply_markup=keyboard
+    )
+
 async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await tg_send(
         update.effective_chat.id,
@@ -689,6 +707,7 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/skip    – Skip to next stranger\n"
         "/stop    – Disconnect\n"
         "/report  – Report current partner\n"
+        "/webapp  – Open the web app\n"
         "/sticker – Get our sticker to share\n"
         "/help    – Show this message\n\n"
         "💬 Type normally to send messages when connected.\n"
@@ -931,9 +950,10 @@ async def _reengagement_loop():
                     name = info.get("name", "there")
 
                     try:
-                        keyboard = InlineKeyboardMarkup([[
-                            InlineKeyboardButton("Find a Stranger", callback_data="connect"),
-                        ]])
+                        keyboard = InlineKeyboardMarkup([
+                            [InlineKeyboardButton("Find a Stranger", callback_data="connect")],
+                            [InlineKeyboardButton("🌐 Go to Web App", url=WEB_APP_URL)],
+                        ])
                         await tg_send(
                             chat_id,
                             f"Hey {name}! Someone is waiting to chat right now.\n\n"
@@ -966,6 +986,7 @@ def create_bot_app() -> Application:
     application.add_handler(CommandHandler("skip",    cmd_skip))
     application.add_handler(CommandHandler("stop",    cmd_stop))
     application.add_handler(CommandHandler("report",  cmd_report))
+    application.add_handler(CommandHandler("webapp",  cmd_webapp))
     application.add_handler(CommandHandler("help",    cmd_help))
     application.add_handler(CommandHandler("sticker",  cmd_sticker))
     application.add_handler(MessageHandler(filters.PHOTO, handle_photo))
