@@ -15,6 +15,7 @@ import os
 import secrets
 import random
 import logging
+import sys
 import uuid as _uuid
 import base64 as _b64
 import aiohttp
@@ -28,24 +29,35 @@ from telegram.ext import (
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# ── Shared state (imported from server.py) ───────────────────────────────────
-from server import (
-    active_connections,
-    waiting_queue,
-    user_rooms,
-    active_chats,
-    city_users,
-    reports,
-    user_ip_map,
-    ip_report_count,
-    ip_blocks,
-    photo_messages,
-    delete_photo_after_delay,
-    try_match,
-    try_global_match_after_delay,
-    broadcast_stats,
-    sio,
-)
+# ── Shared state (imported from the running server.py module) ─────────────────
+def _server_module():
+    """Return the active server module instead of importing a duplicate copy."""
+    module = sys.modules.get("server") or sys.modules.get("backend.server")
+    if module is not None:
+        return module
+    try:
+        import server as module
+    except ModuleNotFoundError:
+        from . import server as module
+    return module
+
+
+_server = _server_module()
+active_connections = _server.active_connections
+waiting_queue = _server.waiting_queue
+user_rooms = _server.user_rooms
+active_chats = _server.active_chats
+city_users = _server.city_users
+reports = _server.reports
+user_ip_map = _server.user_ip_map
+ip_report_count = _server.ip_report_count
+ip_blocks = _server.ip_blocks
+photo_messages = _server.photo_messages
+delete_photo_after_delay = _server.delete_photo_after_delay
+try_match = _server.try_match
+try_global_match_after_delay = _server.try_global_match_after_delay
+broadcast_stats = _server.broadcast_stats
+sio = _server.sio
 
 # ── Telegram-specific state ──────────────────────────────────────────────────
 tg_users:  dict[int, dict] = {}  # chat_id → {sid, name}

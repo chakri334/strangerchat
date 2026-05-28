@@ -91,7 +91,10 @@ async def lifespan(app_instance):
     telegram_token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
     if telegram_token and telegram_token != "your_bot_token_here":
         try:
-            from bot import run_bot
+            try:
+                from bot import run_bot
+            except ModuleNotFoundError:
+                from .bot import run_bot
             # Wait briefly to catch immediate startup errors
             bot_task = asyncio.create_task(run_bot())
             await asyncio.sleep(3)
