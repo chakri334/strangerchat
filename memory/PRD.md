@@ -4,6 +4,13 @@
 Build a full-stack anonymous stranger chat web app named "Stumble Chat" with real-time text chat (audio CANCELLED), disappearing-photo sharing, Google OAuth + email OTP sign-in, user reporting with IP banning, Telegram admin bot, GA4 analytics, and persistent user/report storage in MongoDB.
 
 ## Recent Changes (Feb 2026)
+- **Phase 2 polish complete (Feb 17 2026):**
+  - 📷 **Profile picture upload** — `POST /api/profile/picture` (multipart, max 2MB, JPEG/PNG/WebP/GIF) and `DELETE /api/profile/picture`. ProfileTab gains a camera button on the avatar with hidden file input and a Remove action. Stored as base64 data URL in `user.picture`.
+  - 🎨 **Legal pages restyled** (`Privacy`, `Terms`, `CookiePolicy`, `Guidelines`) — new shared `LegalPage`/`LegalSection`/`BulletList` components, slate-950 base, emerald section headings, `▹` bullets, sticky header with back-nav. Guidelines uses two-tone (green checks for Welcome, red X's for Not Allowed) layout.
+  - 🌐 **WSS preview ingress workaround** — Socket.IO client transports reordered to `['polling','websocket']` so the `connect` event fires even on preview environments that block WSS (production transparently upgrades to WSS). No behaviour change in production.
+  - 🐛 **Fix**: `ProfileTab` was missing `uploadingPic` state + `fileInputRef`, causing the tab to crash. State + ref added; tab renders cleanly.
+
+
 - **Guest gating + Google-only auth UI (Feb 17 2026):**
   - AuthOnboarding now shows ONLY "Sign in with Google" + "Continue as Guest" buttons (email OTP UI removed, backend endpoints still alive for testing).
   - Guests get a single-screen Random Chat experience with NO bottom tab bar. Upgrade-to-Google link in footer.

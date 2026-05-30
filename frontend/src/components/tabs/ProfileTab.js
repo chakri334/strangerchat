@@ -54,6 +54,8 @@ const ProfileTab = ({ onSaved }) => {
   const [telegramId, setTelegramId] = useState('');
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [uploadingPic, setUploadingPic] = useState(false);
+  const fileInputRef = useRef(null);
 
   const load = useCallback(async () => {
     const { ok, data } = await apiJSON('/api/profile/me');
