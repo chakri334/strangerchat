@@ -71,7 +71,12 @@ const OnboardingModal = ({ onAccept }) => {
             {/* Standalone checkbox div — NOT inside a label so clicking
                 the legal links doesn't accidentally toggle the checkbox */}
             <div
+              role="checkbox"
+              aria-checked={checked}
+              tabIndex={0}
               onClick={() => setChecked(!checked)}
+              onKeyDown={(e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); setChecked(!checked); } }}
+              data-testid="age-agree-checkbox"
               className={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 mt-0.5 border transition-all cursor-pointer ${
                 checked
                   ? 'bg-gradient-to-r from-[#7c5cfc] to-[#fc5c7d] border-transparent'
@@ -112,6 +117,7 @@ const OnboardingModal = ({ onAccept }) => {
           <button
             onClick={handleAccept}
             disabled={!checked}
+            data-testid="age-confirm-btn"
             className={`w-full py-4 rounded-xl font-bold text-lg transition-all ${
               checked
                 ? 'bg-gradient-to-r from-[#7c5cfc] to-[#fc5c7d] hover:shadow-lg hover:shadow-purple-500/20 text-white'

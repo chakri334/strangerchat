@@ -15,7 +15,7 @@ const INTERESTED_IN_OPTIONS = [
   { value: '', label: 'Anyone' },
   { value: 'male', label: 'Men' },
   { value: 'female', label: 'Women' },
-  { value: 'both', label: 'Everyone' },
+  { value: 'both', label: 'Both' },
 ];
 
 const SUGGESTED_INTERESTS = ['music', 'gaming', 'movies', 'coding', 'art', 'travel', 'fitness', 'foodie', 'memes', 'books'];

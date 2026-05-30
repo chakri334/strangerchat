@@ -4,6 +4,19 @@
 Build a full-stack anonymous stranger chat web app named "Stumble Chat" with real-time text chat (audio CANCELLED), disappearing-photo sharing, Google OAuth + email OTP sign-in, user reporting with IP banning, Telegram admin bot, GA4 analytics, and persistent user/report storage in MongoDB.
 
 ## Recent Changes (Feb 2026)
+- **4-Tab SPA redesign (Feb 17 2026 — based on user-uploaded `stumbleChat002-main` mockup):**
+  - New layout: AppHeader (sticky top, brand pill + live badge + settings/logout) + main content + BottomTabBar (fixed bottom).
+  - 4 tabs: **People** (live directory of online users with interest chips + direct-connect), **Random Chat** (existing connect→queue→match flow), **Chats** (empty-state for now), **Profile** (editable bio/gender/interested-in/interests).
+  - Visual refresh: slate-950 base + emerald-400 accents, kept purple #7c5cfc as secondary brand accent.
+  - Restyled AuthOnboarding to match mockup (Radio icon with sparkle, Privacy First panel, slate/emerald palette).
+  - Brand name unchanged: **Stumble Chat**.
+- **Backend additions (additive — random chat flow untouched):**
+  - `GET /api/profile/me` and `PUT /api/profile/me` — full profile CRUD (bio, gender, interested_in, interests, images, name, picture).
+  - `GET /api/active-users?interests=tag1,tag2` — filters online users by interest tags.
+  - Socket.IO `register_user` now accepts and stores `interests[]`, `interested_in`, `bio` on `active_connections`.
+  - `_resolve_session()` helper unifies cookie + Bearer token auth across endpoints.
+  - Interest tags lowercased + deduplicated server-side; capped at 10. Bio capped at 280 chars. Images capped at 5.
+  - Added data-testids to OnboardingModal (`age-agree-checkbox`, `age-confirm-btn`) for testability.
 - **Comprehensive code-quality pass (Feb 17 2026):**
   - Backend: refactored `google_auth_callback` and `email_verify_otp` into small helpers (`_resolve_trusted_origin`, `_oauth_popup_success/_error`, `_exchange_code_for_profile`, `_upsert_user_from_google`, `_issue_session`, `_set_session_cookie`, `_validate_otp`, `_upsert_email_user`).
   - Backend: switched non-deterministic security choices to `secrets.choice` (emoji + random topic) in server.py and bot.py.

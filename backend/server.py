@@ -803,7 +803,13 @@ async def profile_update(request: Request):
     if body.get('interested_in') in ('male', 'female', 'both', ''):
         updates['interested_in'] = body['interested_in']
     if isinstance(body.get('interests'), list):
-        cleaned = [str(t).strip().lower()[:30] for t in body['interests'] if str(t).strip()]
+        seen = set()
+        cleaned = []
+        for t in body['interests']:
+            tag = str(t).strip().lower()[:30]
+            if tag and tag not in seen:
+                seen.add(tag)
+                cleaned.append(tag)
         updates['interests'] = cleaned[:10]  # cap at 10 tags
     if isinstance(body.get('images'), list):
         # Store data-URLs as-is, cap to 5
