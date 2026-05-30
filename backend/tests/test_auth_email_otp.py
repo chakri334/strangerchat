@@ -22,7 +22,7 @@ if not BASE_URL:
                 BASE_URL = line.split('=', 1)[1].strip().rstrip('/')
                 break
 
-ADMIN_TOKEN = 'stumblechat_admin_2026'
+ADMIN_TOKEN = os.environ.get('ADMIN_TOKEN', 'stumblechat_admin_2026')
 EMOJI_POOL = {'😊', '😎', '🤗', '😺', '🦊', '🐼', '🦄', '🌟'}
 
 

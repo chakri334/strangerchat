@@ -13,7 +13,7 @@ import pytest
 import requests
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL").rstrip("/")
-ADMIN_TOKEN = "stumblechat_admin_2026"
+ADMIN_TOKEN = os.environ.get("ADMIN_TOKEN", "stumblechat_admin_2026")
 
 sys.path.insert(0, "/app/backend")
 

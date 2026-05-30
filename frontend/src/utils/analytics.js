@@ -14,7 +14,9 @@ const isGtagAvailable = () => typeof window !== 'undefined' && typeof window.gta
 export const trackEvent = (eventName, params = {}) => {
   if (isGtagAvailable()) {
     window.gtag('event', eventName, params);
-    console.log(`[GA] Event: ${eventName}`, params);
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[GA] Event: ${eventName}`, params);
+    }
   }
 };
 

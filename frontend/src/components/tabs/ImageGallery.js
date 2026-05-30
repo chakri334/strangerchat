@@ -57,7 +57,7 @@ const ImageGallery = ({ images, onChange }) => {
           const img = images[idx];
           if (img) {
             return (
-              <div key={idx} className="relative group aspect-square rounded-xl overflow-hidden border border-slate-800" data-testid={`gallery-slot-${idx}`}>
+              <div key={`img-${img.slice(-32)}-${idx}`} className="relative group aspect-square rounded-xl overflow-hidden border border-slate-800" data-testid={`gallery-slot-${idx}`}>
                 <img src={img} alt={`Gallery ${idx + 1}`} className="w-full h-full object-cover" />
                 <button
                   type="button"
@@ -74,7 +74,7 @@ const ImageGallery = ({ images, onChange }) => {
           if (idx === filled) {
             return (
               <button
-                key={idx}
+                key={`add-slot-${idx}`}
                 type="button"
                 onClick={() => fileRef.current?.click()}
                 disabled={uploading || filled >= MAX_IMAGES}
@@ -87,7 +87,7 @@ const ImageGallery = ({ images, onChange }) => {
             );
           }
           return (
-            <div key={idx} className="aspect-square rounded-xl border border-slate-800 bg-slate-900/40" />
+            <div key={`empty-slot-${idx}`} className="aspect-square rounded-xl border border-slate-800 bg-slate-900/40" />
           );
         })}
       </div>
