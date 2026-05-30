@@ -55,7 +55,7 @@ const Home = () => {
     () => !localStorage.getItem('hasSeenOnboarding')
   );
   const [isAuthed, setIsAuthed] = useState(() => !!localStorage.getItem('authSession'));
-  const [activeTab, setActiveTab] = useState('match');
+  const [activeTab, setActiveTab] = useState('random');
   const [activePeer, setActivePeer] = useState(null); // for persistent chat
   const [chatRefreshKey, setChatRefreshKey] = useState(0);
 
@@ -349,14 +349,14 @@ const Home = () => {
 
       <main className="flex flex-1 flex-col overflow-hidden pb-16">
         {activeTab === 'people' && <PeopleTab onOpenChat={openDirectChat} />}
-        {activeTab === 'match' && (
+        {activeTab === 'random' && (
           <RandomChatTab isConnected={isConnected} isSearching={isSearching} onConnect={handleConnect} stats={stats} />
         )}
         {activeTab === 'chats' && (
           <ChatsTab
             refreshKey={chatRefreshKey}
             onOpenChat={openDirectChat}
-            onGoMatch={() => setActiveTab('match')}
+            onGoMatch={() => setActiveTab('random')}
             onGoPeople={() => setActiveTab('people')}
           />
         )}

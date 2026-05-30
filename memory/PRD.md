@@ -4,6 +4,15 @@
 Build a full-stack anonymous stranger chat web app named "Stumble Chat" with real-time text chat (audio CANCELLED), disappearing-photo sharing, Google OAuth + email OTP sign-in, user reporting with IP banning, Telegram admin bot, GA4 analytics, and persistent user/report storage in MongoDB.
 
 ## Recent Changes (Feb 2026)
+
+- **Backend router-split refactor validated (Feb 22 2026):**
+  - 59/59 backend tests pass across the new 5-router layout (`auth.py`, `profile.py`, `block.py`, `conversations.py`, `admin.py`).
+  - `state.py` shared dicts confirmed as the single source of truth (Socket.IO ⇄ REST share identical objects).
+  - Admin token gating, Socket.IO polling reachability, and `bot.py` clean-import all green.
+  - ProfileTab `uploadingPic` ReferenceError regression confirmed fixed (line 59 declares state).
+  - LOW-fix applied: BottomTabBar Random Chat tab renamed `match` → `random` so the `data-testid="tab-random"` matches the documented convention across all four tabs. All references in `Home.js` updated.
+
+
 - **Phase 2 polish complete (Feb 17 2026):**
   - 📷 **Profile picture upload** — `POST /api/profile/picture` (multipart, max 2MB, JPEG/PNG/WebP/GIF) and `DELETE /api/profile/picture`. ProfileTab gains a camera button on the avatar with hidden file input and a Remove action. Stored as base64 data URL in `user.picture`.
   - 🎨 **Legal pages restyled** (`Privacy`, `Terms`, `CookiePolicy`, `Guidelines`) — new shared `LegalPage`/`LegalSection`/`BulletList` components, slate-950 base, emerald section headings, `▹` bullets, sticky header with back-nav. Guidelines uses two-tone (green checks for Welcome, red X's for Not Allowed) layout.

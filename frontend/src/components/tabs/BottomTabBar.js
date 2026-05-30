@@ -2,7 +2,7 @@ import { Users, Radio, MessageSquare, User } from 'lucide-react';
 
 const TABS = [
   { id: 'people', label: 'People', icon: Users, accent: 'text-emerald-400' },
-  { id: 'match', label: 'Random Chat', icon: Radio, accent: 'text-sky-400' },
+  { id: 'random', label: 'Random Chat', icon: Radio, accent: 'text-sky-400' },
   { id: 'chats', label: 'Chats', icon: MessageSquare, accent: 'text-purple-400' },
   { id: 'profile', label: 'Profile', icon: User, accent: 'text-pink-400' },
 ];
@@ -23,7 +23,7 @@ const BottomTabBar = ({ activeTab, onChange }) => (
           }`}
           data-testid={`tab-${id}`}
         >
-          <Icon className={`h-5 w-5 ${active ? `${accent} ${id === 'match' ? 'animate-pulse' : ''}` : 'text-slate-500'}`} />
+          <Icon className={`h-5 w-5 ${active ? `${accent} ${id === 'random' ? 'animate-pulse' : ''}` : 'text-slate-500'}`} />
           <span className="text-[10px] tracking-wide">{label}</span>
         </button>
       );
