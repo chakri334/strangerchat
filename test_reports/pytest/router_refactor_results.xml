@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="18" time="42.112" timestamp="2026-05-30T18:55:25.585704+00:00" hostname="agent-env-b90b7fdf-d211-43fa-acaa-93a1d69e903c"><testcase classname="tests.test_router_refactor.TestAuthRouter" name="test_send_and_verify_otp" time="0.370" /><testcase classname="tests.test_router_refactor.TestAuthRouter" name="test_me_with_bearer" time="0.326" /><testcase classname="tests.test_router_refactor.TestAuthRouter" name="test_me_unauth" time="0.114" /><testcase classname="tests.test_router_refactor.TestProfileRouter" name="test_profile_me_fields" time="0.359" /><testcase classname="tests.test_router_refactor.TestProfileRouter" name="test_profile_update_dedup_and_cap" time="0.342" /><testcase classname="tests.test_router_refactor.TestProfileRouter" name="test_active_users_self_excluded" time="0.322" /><testcase classname="tests.test_router_refactor.TestProfileRouter" name="test_users_search" time="0.656" /><testcase classname="tests.test_router_refactor.TestBlockRouter" name="test_block_roundtrip" time="0.873" /><testcase classname="tests.test_router_refactor.TestBlockRouter" name="test_hotlist_roundtrip" time="0.780" /><testcase classname="tests.test_router_refactor.TestConversationsRouter" name="test_send_get_delete_message" time="0.884" /><testcase classname="tests.test_router_refactor.TestConversationsRouter" name="test_clear_conversation" time="0.859" /><testcase classname="tests.test_router_refactor.TestAdminRouter" name="test_admin_users_requires_token" time="20.014"><failure message="requests.exceptions.ConnectTimeout: HTTPSConnectionPool(host='socket-io-staging.preview.emergentagent.com', port=443): Max retries exceeded with url: /api/admin/users (Caused by ConnectTimeoutError(&lt;HTTPSConnection(host='socket-io-staging.preview.emergentagent.com', port=443) at 0xfb2b762aeed0&gt;, 'Connection to socket-io-staging.preview.emergentagent.com timed out. (connect timeout=10)'))">/root/.venv/lib/python3.11/site-packages/urllib3/connection.py:204: in _new_conn
+    sock = connection.create_connection(
+/root/.venv/lib/python3.11/site-packages/urllib3/util/connection.py:85: in create_connection
+    raise err
+/root/.venv/lib/python3.11/site-packages/urllib3/util/connection.py:73: in create_connection
+    sock.connect(sa)
+E   TimeoutError: timed out
+
+The above exception was the direct cause of the following exception:
+/root/.venv/lib/python3.11/site-packages/urllib3/connectionpool.py:787: in urlopen
+    response = self._make_request(
+/root/.venv/lib/python3.11/site-packages/urllib3/connectionpool.py:488: in _make_request
+    raise new_e
+/root/.venv/lib/python3.11/site-packages/urllib3/connectionpool.py:464: in _make_request
+    self._validate_conn(conn)
+/root/.venv/lib/python3.11/site-packages/urllib3/connectionpool.py:1093: in _validate_conn
+    conn.connect()
+/root/.venv/lib/python3.11/site-packages/urllib3/connection.py:759: in connect
+    self.sock = sock = self._new_conn()
+                       ^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/urllib3/connection.py:213: in _new_conn
+    raise ConnectTimeoutError(
+E   urllib3.exceptions.ConnectTimeoutError: (&lt;HTTPSConnection(host='socket-io-staging.preview.emergentagent.com', port=443) at 0xfb2b762aeed0&gt;, 'Connection to socket-io-staging.preview.emergentagent.com timed out. (connect timeout=10)')
+
+The above exception was the direct cause of the following exception:
+/root/.venv/lib/python3.11/site-packages/requests/adapters.py:644: in send
+    resp = conn.urlopen(
+/root/.venv/lib/python3.11/site-packages/urllib3/connectionpool.py:841: in urlopen
+    retries = retries.increment(
+/root/.venv/lib/python3.11/site-packages/urllib3/util/retry.py:535: in increment
+    raise MaxRetryError(_pool, url, reason) from reason  # type: ignore[arg-type]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   urllib3.exceptions.MaxRetryError: HTTPSConnectionPool(host='socket-io-staging.preview.emergentagent.com', port=443): Max retries exceeded with url: /api/admin/users (Caused by ConnectTimeoutError(&lt;HTTPSConnection(host='socket-io-staging.preview.emergentagent.com', port=443) at 0xfb2b762aeed0&gt;, 'Connection to socket-io-staging.preview.emergentagent.com timed out. (connect timeout=10)'))
+
+During handling of the above exception, another exception occurred:
+tests/test_router_refactor.py:198: in test_admin_users_requires_token
+    r = requests.get(f"{BASE_URL}/api/admin/users", timeout=10)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/api.py:73: in get
+    return request("get", url, params=params, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/api.py:59: in request
+    return session.request(method=method, url=url, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/sessions.py:589: in request
+    resp = self.send(prep, **send_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/sessions.py:703: in send
+    r = adapter.send(request, **kwargs)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/adapters.py:665: in send
+    raise ConnectTimeout(e, request=request)
+E   requests.exceptions.ConnectTimeout: HTTPSConnectionPool(host='socket-io-staging.preview.emergentagent.com', port=443): Max retries exceeded with url: /api/admin/users (Caused by ConnectTimeoutError(&lt;HTTPSConnection(host='socket-io-staging.preview.emergentagent.com', port=443) at 0xfb2b762aeed0&gt;, 'Connection to socket-io-staging.preview.emergentagent.com timed out. (connect timeout=10)'))</failure></testcase><testcase classname="tests.test_router_refactor.TestAdminRouter" name="test_admin_users_ok" time="5.276" /><testcase classname="tests.test_router_refactor.TestAdminRouter" name="test_admin_reports_ok" time="10.153" /><testcase classname="tests.test_router_refactor.TestSharedState" name="test_state_module_imports_clean" time="0.115" /><testcase classname="tests.test_router_refactor.TestSharedState" name="test_routers_and_server_import_same_state_objects" time="0.290" /><testcase classname="tests.test_router_refactor.TestSharedState" name="test_socketio_polling_endpoint_reachable" time="0.128" /><testcase classname="tests.test_router_refactor.TestBotImport" name="test_bot_module_imports" time="0.092" /></testsuite></testsuites>
