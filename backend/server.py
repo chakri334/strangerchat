@@ -87,6 +87,26 @@ async def lifespan(app_instance):
     except Exception as e:
         logger.error(f"Failed to initialize MongoDB indexes: {e}")
 
+    # Backfill: ensure all existing users have stumble_id + new default arrays
+    try:
+        async for u in users_collection.find(
+            {'$or': [{'stumble_id': {'$exists': False}}, {'stumble_id': ''}]},
+            {'_id': 0, 'user_id': 1, 'name': 1, 'email': 1}
+        ):
+            new_id = await _generate_unique_stumble_id(u.get('name') or (u.get('email') or '').split('@')[0])
+            await users_collection.update_one(
+                {'user_id': u['user_id']},
+                {'$set': {
+                    'stumble_id': new_id,
+                    'hotlist': [],
+                    'blocked': [],
+                    'telegram_id': '',
+                }},
+            )
+        logger.info("User backfill complete (stumble_id, hotlist, blocked, telegram_id)")
+    except Exception as e:
+        logger.error(f"User backfill failed: {e}")
+
     bot_task = None
     telegram_token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
     if telegram_token and telegram_token != "your_bot_token_here":
@@ -626,12 +646,22 @@ async def _upsert_email_user(email: str, name: str) -> str:
         )
     else:
         user_id = f"user_{secrets.token_hex(6)}"
+        stumble_id = await _generate_unique_stumble_id(name or email.split('@')[0])
         await users_collection.insert_one({
             'user_id': user_id,
             'email': email,
             'name': name,
             'picture': '',
             'provider': 'email',
+            'stumble_id': stumble_id,
+            'gender': '',
+            'interested_in': '',
+            'interests': [],
+            'bio': '',
+            'images': [],
+            'hotlist': [],
+            'blocked': [],
+            'telegram_id': '',
             'created_at': now_iso,
             'last_login_at': now_iso,
         })

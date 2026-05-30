@@ -4,6 +4,39 @@
 Build a full-stack anonymous stranger chat web app named "Stumble Chat" with real-time text chat (audio CANCELLED), disappearing-photo sharing, Google OAuth + email OTP sign-in, user reporting with IP banning, Telegram admin bot, GA4 analytics, and persistent user/report storage in MongoDB.
 
 ## Recent Changes (Feb 2026)
+- **Guest gating + Google-only auth UI (Feb 17 2026):**
+  - AuthOnboarding now shows ONLY "Sign in with Google" + "Continue as Guest" buttons (email OTP UI removed, backend endpoints still alive for testing).
+  - Guests get a single-screen Random Chat experience with NO bottom tab bar. Upgrade-to-Google link in footer.
+  - Signed-in users get the full 4-tab SPA (People / Random Chat / Chats / Profile).
+- **Persistent People-tab chats:**
+  - New `messages` collection in MongoDB with 7-day TTL.
+  - Pinned conversations (`hotlist`) survive the TTL purge.
+  - REST endpoints: `GET/POST /api/conversations`, `GET /api/conversations/{peer}/messages`, `POST /api/conversations/{peer}/messages`, `DELETE /api/conversations/{peer}/messages/{id}?for_everyone=...`, `DELETE /api/conversations/{peer}?for_everyone=...`.
+  - Real-time delivery via Socket.IO events: `direct_message`, `message_deleted`, `conversation_cleared`.
+  - New `PersistentChatPage.js` — WhatsApp-style chat UI with header menu (block / clear-for-me / clear-for-everyone / pin) and per-message delete-for-me/everyone.
+- **Stumble ID (`@handle`):**
+  - Auto-generated unique handle (format `@{slug}{1000-9999}`) on user creation for BOTH Google + email-OTP.
+  - One-time backfill migration runs on app startup for legacy users.
+  - `GET /api/users/search?stumble_id=@xyz` — searchable directory; returns user + online status.
+- **Block & Hotlist:**
+  - `POST/DELETE /api/block/{user_id}`, `GET /api/blocked` — block stops messaging both ways.
+  - `POST/DELETE /api/hotlist/{user_id}` — pin/unpin a peer; pinning rewrites the conversation's TTL.
+  - Block + hotlist + telegram_id all editable from `/settings` (renamed Settings page).
+- **People-tab improvements:**
+  - Search input by Stumble ID.
+  - "Sort by distance" CTA — uses browser geolocation (haversine on backend) — falls back to global list when permission denied.
+  - Automatic filter by requester's `interested_in` preference (server-enforced).
+  - Excludes self + my-blocked users.
+- **Gender lock for Google users:**
+  - `profile.gender_locked = true` in `GET /api/profile/me` if provider=='google' AND gender is set.
+  - PUT silently ignores gender updates for Google users.
+  - Frontend ProfileTab pills disabled and shows "(locked)" label.
+- **Settings page rewritten:** identity card with Stumble ID + copy, display-name editor, Telegram link editor, blocked-users list with unblock action, legal links.
+- **Bug fixes from testing agent:**
+  - `if not peer_doc:` → `if peer_doc is None:` in `send_message` (projection-of-missing-fields bug → 404 for older users).
+- **Random chat untouched:** existing socket flow + Telegram bot preserved.
+
+
 - **4-Tab SPA redesign (Feb 17 2026 — based on user-uploaded `stumbleChat002-main` mockup):**
   - New layout: AppHeader (sticky top, brand pill + live badge + settings/logout) + main content + BottomTabBar (fixed bottom).
   - 4 tabs: **People** (live directory of online users with interest chips + direct-connect), **Random Chat** (existing connect→queue→match flow), **Chats** (empty-state for now), **Profile** (editable bio/gender/interested-in/interests).
