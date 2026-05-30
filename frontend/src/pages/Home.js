@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { io } from 'socket.io-client';
 import { toast } from 'sonner';
 import ChatPage from '../components/ChatPage';
+import PersistentChatPage from '../components/PersistentChatPage';
 import WaitingPage from '../components/WaitingPage';
 import { Analytics } from '../utils/analytics';
 import { setGeoTitle, trackCitySearch, trackGeoMatch } from '../utils/seo';
@@ -14,7 +15,7 @@ import BottomTabBar from '../components/tabs/BottomTabBar';
 import PeopleTab from '../components/tabs/PeopleTab';
 import ProfileTab from '../components/tabs/ProfileTab';
 import RandomChatTab from '../components/tabs/RandomChatTab';
-import ChatsTabEmpty from '../components/tabs/ChatsTabEmpty';
+import ChatsTab from '../components/tabs/ChatsTab';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const RETRY_INTERVAL_MS = 60000;
@@ -27,6 +28,13 @@ const readStoredInterests = () => {
   } catch {
     return [];
   }
+};
+
+const isGuestMode = () => {
+  try {
+    const s = JSON.parse(localStorage.getItem('authSession') || '{}');
+    return s.mode === 'guest';
+  } catch { return false; }
 };
 
 const Home = () => {
@@ -48,6 +56,11 @@ const Home = () => {
   );
   const [isAuthed, setIsAuthed] = useState(() => !!localStorage.getItem('authSession'));
   const [activeTab, setActiveTab] = useState('match');
+  const [activePeer, setActivePeer] = useState(null); // for persistent chat
+  const [chatRefreshKey, setChatRefreshKey] = useState(0);
+
+  const guest = isGuestMode();
+  const myUserId = user?.user_id;
 
   const socketRef = useRef(null);
   const searchTimerRef = useRef(null);
@@ -61,7 +74,6 @@ const Home = () => {
     setIsSearching(val);
   }, []);
 
-  // Sync user name from auth context
   useEffect(() => {
     if (user?.name && user.name !== userName) {
       setUserName(user.name);
@@ -69,13 +81,12 @@ const Home = () => {
     }
   }, [user, userName]);
 
-  // Fetch authoritative interests from backend profile
+  // Fetch authoritative profile (interests + gender) from backend
   useEffect(() => {
-    if (!isAuthenticated) return;
-    const token = sessionStorage.getItem('session_token');
+    if (!isAuthenticated || guest) return;
     fetch(`${BACKEND_URL}/api/profile/me`, {
       credentials: 'include',
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      headers: { Authorization: `Bearer ${sessionStorage.getItem('session_token') || ''}` },
     })
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
@@ -83,20 +94,21 @@ const Home = () => {
           const ints = data.profile.interests || [];
           setUserInterests(ints);
           localStorage.setItem('userInterests', JSON.stringify(ints));
+          if (data.profile.gender) {
+            setUserGender(data.profile.gender);
+            localStorage.setItem('userGender', data.profile.gender);
+          }
         }
       })
       .catch(() => {});
-  }, [isAuthenticated]);
+  }, [isAuthenticated, guest]);
 
   // IP block check
   useEffect(() => {
     fetch(`${BACKEND_URL}/api/check-ip`)
       .then((r) => r.json())
       .then((data) => {
-        if (data.blocked) {
-          setIsBlocked(true);
-          setBlockMessage(data.message);
-        }
+        if (data.blocked) { setIsBlocked(true); setBlockMessage(data.message); }
       })
       .catch(() => {});
   }, []);
@@ -116,22 +128,14 @@ const Home = () => {
     const newSocket = io(BACKEND_URL, {
       path: '/api/socket.io',
       transports: ['websocket', 'polling'],
-      reconnection: true,
-      reconnectionAttempts: Infinity,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 10000,
-      randomizationFactor: 0.5,
-      timeout: 20000,
-      forceNew: false,
-      multiplex: true,
+      reconnection: true, reconnectionAttempts: Infinity,
+      reconnectionDelay: 1000, reconnectionDelayMax: 10000, randomizationFactor: 0.5,
+      timeout: 20000, forceNew: false, multiplex: true,
     });
     socketRef.current = newSocket;
 
     const buildRegisterPayload = (city) => ({
-      name: savedName,
-      age: savedAge,
-      gender: savedGender,
-      city,
+      name: savedName, age: savedAge, gender: savedGender, city,
       interests: readStoredInterests(),
       session_token: sessionStorage.getItem('session_token') || undefined,
     });
@@ -151,7 +155,7 @@ const Home = () => {
         localStorage.setItem('userCity', detectedCity);
         setGeoTitle(detectedCity);
         trackCitySearch(detectedCity);
-        if (newSocket.connected) newSocket.emit('register_user', buildRegisterPayload(detectedCity));
+        if (newSocket.connected) newSocket.emit('register_user', { ...buildRegisterPayload(detectedCity), lat: position.coords.latitude, lng: position.coords.longitude });
       } catch {}
     };
 
@@ -168,17 +172,11 @@ const Home = () => {
       if (reason !== 'io client disconnect') setTimeout(() => newSocket.connect(), 1000);
     });
     newSocket.on('connect_error', () => setIsConnected(false));
-    newSocket.on('reconnect', (attemptNumber) => {
+    newSocket.on('reconnect', () => {
       newSocket.emit('register_user', buildRegisterPayload(savedCity));
       if (isSearchingRef.current) newSocket.emit('join_queue', { city: savedCity });
-      if (attemptNumber > 1) toast.success('Reconnected!');
     });
-    newSocket.on('reconnect_failed', () => toast.error('Connection lost. Please refresh the page.'));
-    newSocket.on('blocked', (data) => {
-      setIsBlocked(true);
-      setBlockMessage(data.message);
-      toast.error(data.message);
-    });
+    newSocket.on('blocked', (data) => { setIsBlocked(true); setBlockMessage(data.message); toast.error(data.message); });
     newSocket.on('stats_update', (data) => setStats(data));
     newSocket.on('match_found', (data) => {
       isSearchingRef.current = false;
@@ -191,48 +189,31 @@ const Home = () => {
       trackGeoMatch(userCityRef.current, data.partner?.city);
       toast.success('Connected to someone!');
     });
-    newSocket.on('partner_disconnected', () => {
-      toast.info('Chat partner disconnected');
-      setChatActive(false);
-      setPartner(null);
-    });
-    newSocket.on('chat_ended', () => {
-      setChatActive(false);
-      setPartner(null);
-    });
+    newSocket.on('partner_disconnected', () => { toast.info('Chat partner disconnected'); setChatActive(false); setPartner(null); });
+    newSocket.on('chat_ended', () => { setChatActive(false); setPartner(null); });
+
+    // New: refresh chats tab when new direct message arrives
+    newSocket.on('direct_message', () => setChatRefreshKey((k) => k + 1));
+    newSocket.on('message_deleted', () => setChatRefreshKey((k) => k + 1));
+    newSocket.on('conversation_cleared', () => setChatRefreshKey((k) => k + 1));
 
     setSocket(newSocket);
 
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && socketRef.current && !socketRef.current.connected) {
-        socketRef.current.connect();
-      }
-    };
-    const handleOnline = () => {
-      if (socketRef.current && !socketRef.current.connected) socketRef.current.connect();
-    };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('online', handleOnline);
-
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('online', handleOnline);
-      newSocket.close();
-    };
+    return () => newSocket.close();
   }, []);
 
-  // Re-register on the socket whenever interests change (so PeopleTab sees them)
+  // Re-register on interest/gender changes
   useEffect(() => {
     if (!socket || !socket.connected) return;
     socket.emit('register_user', {
-      name: userName || localStorage.getItem('userName') || 'Anonymous',
+      name: userName || 'Anonymous',
       age: localStorage.getItem('userAge') || '',
       gender: userGender,
       city: userCity,
       interests: userInterests,
       session_token: sessionStorage.getItem('session_token') || undefined,
     });
-  }, [userInterests, socket, userName, userGender, userCity]);
+  }, [userInterests, userGender, userName, userCity, socket]);
 
   const scheduleRetry = useCallback((thisSearch) => {
     searchTimerRef.current = setTimeout(() => {
@@ -245,12 +226,8 @@ const Home = () => {
   }, [chatActive]);
 
   const handleConnect = useCallback(() => {
-    if (!socket) { toast.error('Please wait, initializing...'); return; }
-    if (!socket.connected) {
-      socket.connect();
-      toast.info('Reconnecting...');
-      return;
-    }
+    if (!socket) { toast.error('Please wait, initializing…'); return; }
+    if (!socket.connected) { socket.connect(); toast.info('Reconnecting…'); return; }
     if (isSearching) return;
     setIsSearchingSync(true);
     socket.emit('join_queue', { city: userCity });
@@ -259,13 +236,6 @@ const Home = () => {
     const thisSearch = ++searchCountRef.current;
     scheduleRetry(thisSearch);
   }, [socket, isSearching, userCity, setIsSearchingSync, scheduleRetry]);
-
-  const handleDirectChat = useCallback((targetSid) => {
-    if (!socket || !socket.connected) { toast.error('Not connected yet'); return; }
-    setIsSearchingSync(true);
-    socket.emit('join_queue', { city: userCity, target_sid: targetSid });
-    toast.info('Connecting you to selected user…');
-  }, [socket, userCity, setIsSearchingSync]);
 
   const handleCloseChat = useCallback(() => {
     setChatActive(false); setPartner(null); setIsSearchingSync(false);
@@ -301,22 +271,72 @@ const Home = () => {
     if (p?.name) setUserName(p.name);
   }, []);
 
-  // ── Routing guards (full-screen states) ─────────────────────────────────
+  const openDirectChat = useCallback((peer) => {
+    if (!peer?.user_id) {
+      toast.error('That user is anonymous and cannot be saved-messaged.');
+      return;
+    }
+    setActivePeer(peer);
+  }, []);
+
+  // ── Routing guards ─────────────────────────────────────────────────────
   if (!isAuthed) return <AuthOnboarding onAuthenticated={() => setIsAuthed(true)} />;
   if (showOnboarding) return <OnboardingModal onAccept={() => setShowOnboarding(false)} />;
   if (isSearching && !chatActive) return <WaitingPage onCancel={handleCancelSearch} />;
   if (chatActive && partner && socket) {
     return <ChatPage socket={socket} partner={partner} onClose={handleCloseChat} onSkip={handleSkipToNew} />;
   }
+  if (activePeer) {
+    return (
+      <PersistentChatPage
+        peer={activePeer}
+        socket={socket}
+        myUserId={myUserId}
+        onBack={() => { setActivePeer(null); setChatRefreshKey((k) => k + 1); }}
+        onBlocked={() => setChatRefreshKey((k) => k + 1)}
+      />
+    );
+  }
   if (isBlocked) return <BlockedScreen message={blockMessage} />;
 
-  const profileForHeader = {
-    name: user?.name || userName,
-    avatar: user?.picture ? null : '😊',
-  };
+  const profileForHeader = { name: user?.name || userName, avatar: user?.picture ? null : '😊' };
 
+  // ── Guest mode: ONLY Random Chat. No tabs, no header buttons except settings ──
+  if (guest) {
+    return (
+      <div className="flex min-h-screen flex-col bg-slate-950 text-slate-100" data-testid="guest-home">
+        <AppHeader
+          profile={profileForHeader}
+          isConnected={isConnected}
+          isAuthenticated={false}
+          onLogout={logout}
+        />
+        <main className="flex flex-1 flex-col">
+          <RandomChatTab
+            isConnected={isConnected}
+            isSearching={isSearching}
+            onConnect={handleConnect}
+            stats={stats}
+          />
+        </main>
+        <div className="text-center text-[10px] text-slate-500 py-3 border-t border-slate-900">
+          Guest mode · Random Chat only ·{' '}
+          <button
+            onClick={() => { localStorage.removeItem('authSession'); setIsAuthed(false); }}
+            className="text-emerald-400 underline"
+            data-testid="upgrade-to-google-btn"
+          >
+            Sign in with Google
+          </button>
+          {' '}to unlock People, Chats and Profile
+        </div>
+      </div>
+    );
+  }
+
+  // ── Signed-in mode: full 4-tab SPA ──
   return (
-    <div className="flex min-h-screen flex-col bg-slate-950 text-slate-100 selection:bg-emerald-500 selection:text-slate-950" data-testid="home-page">
+    <div className="flex min-h-screen flex-col bg-slate-950 text-slate-100" data-testid="home-page">
       <AppHeader
         profile={profileForHeader}
         isConnected={isConnected}
@@ -325,32 +345,19 @@ const Home = () => {
       />
 
       <main className="flex flex-1 flex-col overflow-hidden pb-16">
-        {activeTab === 'people' && (
-          <PeopleTab
-            myInterests={userInterests}
-            onDirectConnect={handleDirectChat}
-          />
-        )}
-
+        {activeTab === 'people' && <PeopleTab onOpenChat={openDirectChat} />}
         {activeTab === 'match' && (
-          <RandomChatTab
-            isConnected={isConnected}
-            isSearching={isSearching}
-            onConnect={handleConnect}
-            stats={stats}
-          />
+          <RandomChatTab isConnected={isConnected} isSearching={isSearching} onConnect={handleConnect} stats={stats} />
         )}
-
         {activeTab === 'chats' && (
-          <ChatsTabEmpty
+          <ChatsTab
+            refreshKey={chatRefreshKey}
+            onOpenChat={openDirectChat}
             onGoMatch={() => setActiveTab('match')}
             onGoPeople={() => setActiveTab('people')}
           />
         )}
-
-        {activeTab === 'profile' && (
-          <ProfileTab onSaved={handleProfileSaved} />
-        )}
+        {activeTab === 'profile' && <ProfileTab onSaved={handleProfileSaved} />}
       </main>
 
       <BottomTabBar activeTab={activeTab} onChange={setActiveTab} />

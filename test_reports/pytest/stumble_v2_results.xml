@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="17" time="55.311" timestamp="2026-05-30T18:08:11.963938+00:00" hostname="agent-env-b90b7fdf-d211-43fa-acaa-93a1d69e903c"><testcase classname="tests.test_stumble_features_v2.TestStumbleId" name="test_new_email_user_has_no_stumble_id_until_google" time="0.405" /><testcase classname="tests.test_stumble_features_v2.TestStumbleId" name="test_simulated_google_user_has_stumble_id" time="0.003" /><testcase classname="tests.test_stumble_features_v2.TestGenderLock" name="test_email_user_can_set_and_change_gender" time="0.689" /><testcase classname="tests.test_stumble_features_v2.TestGenderLock" name="test_google_user_gender_locked_after_set" time="0.589" /><testcase classname="tests.test_stumble_features_v2.TestTelegramId" name="test_set_telegram_id" time="0.468" /><testcase classname="tests.test_stumble_features_v2.TestTelegramId" name="test_telegram_id_truncated_64" time="30.026"><failure message="requests.exceptions.ConnectTimeout: HTTPSConnectionPool(host='socket-io-staging.preview.emergentagent.com', port=443): Max retries exceeded with url: /api/auth/email/send-otp (Caused by ConnectTimeoutError(&lt;HTTPSConnection(host='socket-io-staging.preview.emergentagent.com', port=443) at 0xf8dd44b2dc50&gt;, 'Connection to socket-io-staging.preview.emergentagent.com timed out. (connect timeout=15)'))">/root/.venv/lib/python3.11/site-packages/urllib3/connection.py:204: in _new_conn
+    sock = connection.create_connection(
+/root/.venv/lib/python3.11/site-packages/urllib3/util/connection.py:85: in create_connection
+    raise err
+/root/.venv/lib/python3.11/site-packages/urllib3/util/connection.py:73: in create_connection
+    sock.connect(sa)
+E   TimeoutError: timed out
+
+The above exception was the direct cause of the following exception:
+/root/.venv/lib/python3.11/site-packages/urllib3/connectionpool.py:787: in urlopen
+    response = self._make_request(
+/root/.venv/lib/python3.11/site-packages/urllib3/connectionpool.py:488: in _make_request
+    raise new_e
+/root/.venv/lib/python3.11/site-packages/urllib3/connectionpool.py:464: in _make_request
+    self._validate_conn(conn)
+/root/.venv/lib/python3.11/site-packages/urllib3/connectionpool.py:1093: in _validate_conn
+    conn.connect()
+/root/.venv/lib/python3.11/site-packages/urllib3/connection.py:759: in connect
+    self.sock = sock = self._new_conn()
+                       ^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/urllib3/connection.py:213: in _new_conn
+    raise ConnectTimeoutError(
+E   urllib3.exceptions.ConnectTimeoutError: (&lt;HTTPSConnection(host='socket-io-staging.preview.emergentagent.com', port=443) at 0xf8dd44b2dc50&gt;, 'Connection to socket-io-staging.preview.emergentagent.com timed out. (connect timeout=15)')
+
+The above exception was the direct cause of the following exception:
+/root/.venv/lib/python3.11/site-packages/requests/adapters.py:644: in send
+    resp = conn.urlopen(
+/root/.venv/lib/python3.11/site-packages/urllib3/connectionpool.py:841: in urlopen
+    retries = retries.increment(
+/root/.venv/lib/python3.11/site-packages/urllib3/util/retry.py:535: in increment
+    raise MaxRetryError(_pool, url, reason) from reason  # type: ignore[arg-type]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   urllib3.exceptions.MaxRetryError: HTTPSConnectionPool(host='socket-io-staging.preview.emergentagent.com', port=443): Max retries exceeded with url: /api/auth/email/send-otp (Caused by ConnectTimeoutError(&lt;HTTPSConnection(host='socket-io-staging.preview.emergentagent.com', port=443) at 0xf8dd44b2dc50&gt;, 'Connection to socket-io-staging.preview.emergentagent.com timed out. (connect timeout=15)'))
+
+During handling of the above exception, another exception occurred:
+tests/test_stumble_features_v2.py:128: in test_telegram_id_truncated_64
+    token, _ = _make_user("tg_id_long", "TgLong")
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_stumble_features_v2.py:26: in _make_user
+    r = requests.post(f"{BASE_URL}/api/auth/email/send-otp", json={"email": email}, timeout=15)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/api.py:115: in post
+    return request("post", url, data=data, json=json, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/api.py:59: in request
+    return session.request(method=method, url=url, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/sessions.py:589: in request
+    resp = self.send(prep, **send_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/sessions.py:703: in send
+    r = adapter.send(request, **kwargs)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/adapters.py:665: in send
+    raise ConnectTimeout(e, request=request)
+E   requests.exceptions.ConnectTimeout: HTTPSConnectionPool(host='socket-io-staging.preview.emergentagent.com', port=443): Max retries exceeded with url: /api/auth/email/send-otp (Caused by ConnectTimeoutError(&lt;HTTPSConnection(host='socket-io-staging.preview.emergentagent.com', port=443) at 0xf8dd44b2dc50&gt;, 'Connection to socket-io-staging.preview.emergentagent.com timed out. (connect timeout=15)'))</failure></testcase><testcase classname="tests.test_stumble_features_v2.TestUsersSearch" name="test_search_missing_returns_null" time="15.501" /><testcase classname="tests.test_stumble_features_v2.TestUsersSearch" name="test_search_found" time="0.557" /><testcase classname="tests.test_stumble_features_v2.TestBlock" name="test_block_unblock_list" time="1.128" /><testcase classname="tests.test_stumble_features_v2.TestBlock" name="test_blocked_user_cannot_message" time="0.770" /><testcase classname="tests.test_stumble_features_v2.TestConversations" name="test_full_chat_flow" time="0.971" /><testcase classname="tests.test_stumble_features_v2.TestConversations" name="test_delete_for_everyone" time="0.819" /><testcase classname="tests.test_stumble_features_v2.TestConversations" name="test_delete_for_me_only" time="0.927" /><testcase classname="tests.test_stumble_features_v2.TestConversations" name="test_delete_conversation_for_everyone" time="0.997" /><testcase classname="tests.test_stumble_features_v2.TestHotlist" name="test_pin_removes_ttl" time="0.796" /><testcase classname="tests.test_stumble_features_v2.TestActiveUsers" name="test_no_auth_returns_users_list" time="0.110" /><testcase classname="tests.test_stumble_features_v2.TestActiveUsers" name="test_authed_excludes_self" time="0.320" /></testsuite></testsuites>

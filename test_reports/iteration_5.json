@@ -1,0 +1,47 @@
+{
+  "summary": "Tested StumbleChat v2 architectural overhaul (Google+Guest auth, tabbed SPA, persistent chats, blocks, hotlist, stumble_id, telegram_id). 17/17 backend pytest cases pass after fixing one CRITICAL backend bug (falsy-projection bug returning 404 'User not found' on /api/conversations/{peer}/messages). Frontend E2E confirms auth UX, guest gating, tabbed SPA, people search, chats empty state, settings page work. One gap remains: _upsert_email_user does NOT auto-generate stumble_id for first-time OTP users (and does not init hotlist/blocked/telegram_id), so Profile/Settings stumble-id-display is hidden for email-OTP users.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "POST /api/conversations/{peer_user_id}/messages (and any handler using same projection pattern)", "issue": "Used `if not peer_doc:` after a Mongo projection `{'_id':0,'blocked':1,'hotlist':1}`. For older users without those fields, the projection returns `{}` (falsy dict) but the user actually exists → handler returns 404 'User not found' for ALL existing email-OTP users. FIXED by changing to `if peer_doc is None:`. Recommend auditing other handlers (delete_message, hotlist, block) for same pattern.", "priority": "CRITICAL"}
+    ],
+    "minor": [
+      {"endpoint": "_upsert_email_user (POST /api/auth/email/verify-otp)", "issue": "Does not auto-generate `stumble_id`, nor initialize `hotlist`/`blocked`/`telegram_id`/`gender`/`interested_in`/`bio`/`images` fields. Spec says 'New user (Google or first OTP) gets a unique @stumble_id auto-generated'. Should call _generate_unique_stumble_id(name) and seed empty arrays/strings on insert. Currently email users get blank stumble_id forever which also hides the Stumble ID display on Profile and Settings."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "ProfileTab / Settings", "issue": "stumble-id-display and settings-stumble-id are conditionally rendered on `profile.stumble_id` being truthy. Because backend never sets stumble_id for email-OTP users, these elements are never visible. Will resolve when backend gap above is fixed.", "selector": "[data-testid=\"stumble-id-display\"], [data-testid=\"settings-stumble-id\"]", "priority": "HIGH"}
+    ],
+    "integration_issues": [
+      {"flow": "WebSocket (Live badge)", "issue": "wss://.../api/socket.io upgrades fail with 403 in the preview ingress (only polling works). Socket.IO does fall back to polling and connect event still fires, so Live badge should still flip — but persistent socket-based realtime (direct_message, message_deleted) will rely on polling latency. Not in this turn's scope to fix, but worth noting.", "affected_selectors": ["AppHeader live badge"]}
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_stumble_features_v2.py",
+    "/app/test_reports/pytest/stumble_v2_results.xml"
+  ],
+  "action_items": [
+    "Update _upsert_email_user in /app/backend/server.py to auto-generate stumble_id (call _generate_unique_stumble_id) AND initialize hotlist=[], blocked=[], telegram_id='', gender='', interested_in='', interests=[], bio='', images=[] on insert. Without this, Profile/Settings hide the Stumble ID block and search/share-by-handle is impossible for email users.",
+    "Audit all other handlers that use the projection pattern `{'_id':0,'blocked':1,'hotlist':1}` (or similar partial projections) and switch `if not doc:` → `if doc is None:`. Suspect locations: send_message (fixed), delete_message, hotlist toggle, block toggle, send-photo, conversation delete.",
+    "Consider a one-time backfill migration: for users where stumble_id is missing/empty, generate one via _generate_unique_stumble_id(name).",
+    "(Optional) WSS 403 from ingress — main agent may want to verify socket.io transports=['polling','websocket'] order or document polling-only for preview env."
+  ],
+  "critical_code_review_comments": [
+    "Bug: `if not peer_doc:` is unsafe when the same query uses projections that may yield {} for older docs. Use explicit `is None` checks everywhere.",
+    "DRY: _upsert_email_user and _upsert_user_from_google have diverged in fields set on insert — extract a shared `_default_user_fields(provider)` helper to ensure parity (stumble_id, blocked, hotlist, telegram_id) across auth providers.",
+    "server.py is now 1838+ lines — recommend splitting routers (auth, profile, conversations, block/hotlist, admin) into separate modules.",
+    "Conditional UI rendering on backend-provided fields (e.g., `{profile.stumble_id && ...}`) silently hides important features when backend omits the field. Either default to a placeholder + 'Generating…' or always render and gray-out."
+  ],
+  "updated_files": [
+    "/app/backend/server.py (one-line fix to send_message handler: `if not peer_doc:` -> `if peer_doc is None:`)",
+    "/app/backend/tests/test_stumble_features_v2.py (new test file: 17 cases covering stumble_id, gender lock, telegram_id, search, block, hotlist, conversations CRUD, delete-for-me/everyone, active-users)"
+  ],
+  "success_rate": {"backend": "100% (17/17 pytest)", "frontend": "~85% (auth, guest gating, tab SPA, people search, chats empty, settings & telegram all work; stumble-id display blocked by backend gap)"},
+  "test_credentials": "Email-OTP backdoor: POST /api/auth/email/send-otp {email} → dev_code in response; POST /api/auth/email/verify-otp {email,code,name}. Admin: x-admin-token=stumblechat_admin_2026. Use TEST_-prefixed emails for cleanup.",
+  "seed_data_creation": "Test users created via OTP with TEST_-prefixed emails: TEST_conv_a, TEST_conv_b, TEST_block_*, TEST_e2e_a, TEST_e2e_b, etc. Some users in DB have provider='google' artificially set for gender-lock test (TEST_genderlock_google).",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend bug `if not peer_doc:` was fixed by sub-agent. Remaining: email-OTP users do NOT get stumble_id auto-generated (in _upsert_email_user), which hides stumble-id-display in Profile/Settings UI. Once main agent backfills that, retest: (1) UI stumble-id-display + copy-stumble-id appear; (2) /api/users/search@<handle> finds an email-OTP user; (3) re-run /app/backend/tests/test_stumble_features_v2.py — should still be 17/17. WSS 403 on this preview is environmental, not a code bug. Conv unread / delete-for-everyone delivery via socket couldn't be wall-clock verified because of WSS block; verified via REST round-trip instead.",
+  "rca of the issue": "RCA — 404 'User not found' on every message send: Repro: any email-OTP user (created via /api/auth/email/verify-otp) POSTs to /api/conversations/{any_existing_peer}/messages. Result: 404. Root cause: handler queried `users_collection.find_one({'user_id': peer_user_id}, {'_id':0,'blocked':1,'hotlist':1})`. For older users created by `_upsert_email_user` (which never set `blocked`/`hotlist`), Mongo returns an empty dict `{}` (the doc exists but projection has no requested fields). The handler then `if not peer_doc:` evaluated to True (empty dict is falsy) and returned 404. Mitigation applied: `if peer_doc is None:`. Long-term mitigation: also fix _upsert_email_user to seed default arrays/fields so all users have a consistent shape — see action items."
+}

@@ -17,7 +17,7 @@ import hashlib
 import re
 import requests
 from urllib.parse import urlencode
-from db import users_collection, reports_collection, sessions_collection, otp_collection, init_indexes
+from db import users_collection, reports_collection, sessions_collection, otp_collection, messages_collection, init_indexes, conv_id_for
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -353,12 +353,22 @@ async def _upsert_user_from_google(profile: dict) -> str:
         logger.info(f"Existing user logged in: {email}")
     else:
         user_id = f"user_{secrets.token_hex(6)}"
+        stumble_id = await _generate_unique_stumble_id(name or email.split('@')[0])
         await users_collection.insert_one({
             'user_id': user_id,
             'email': email,
             'name': name,
             'picture': picture,
             'provider': 'google',
+            'stumble_id': stumble_id,
+            'gender': '',
+            'interested_in': '',
+            'interests': [],
+            'bio': '',
+            'images': [],
+            'hotlist': [],
+            'blocked': [],
+            'telegram_id': '',
             'created_at': now_iso,
             'last_login_at': now_iso,
         })
@@ -373,6 +383,17 @@ async def _upsert_user_from_google(profile: dict) -> str:
         'created_at': now_iso,
     }
     return user_id
+
+
+async def _generate_unique_stumble_id(seed: str) -> str:
+    """Generate a unique @handle for the user. Format: @{slug}{4-digit-suffix}."""
+    base = ''.join(c for c in (seed or '').lower() if c.isalnum())[:12] or 'user'
+    for _ in range(10):
+        candidate = f"@{base}{secrets.randbelow(9000) + 1000}"
+        if not await users_collection.find_one({'stumble_id': candidate}, {'_id': 0}):
+            return candidate
+    # Fallback to longer random
+    return f"@{base}{secrets.token_hex(3)}"
 
 
 async def _issue_session(user_id: str, email: str, name: str, picture: str) -> str:
@@ -701,16 +722,59 @@ async def get_stats():
         'city_counts': city_users
     }
 
+def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Great-circle distance in km."""
+    import math
+    R = 6371.0
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    dp = math.radians(lat2 - lat1)
+    dl = math.radians(lon2 - lon1)
+    a = math.sin(dp / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
+    return 2 * R * math.asin(math.sqrt(a))
+
+
 @app.get('/api/active-users')
-async def get_active_users(city: Optional[str] = None, interests: Optional[str] = None):
-    """List currently-connected users. Optional `interests` is a comma-separated
-    list — users matching ANY of those tags will be returned."""
+async def get_active_users(request: Request,
+                           city: Optional[str] = None,
+                           interests: Optional[str] = None,
+                           lat: Optional[float] = None,
+                           lng: Optional[float] = None,
+                           gender_filter: Optional[str] = None):
+    """List currently-connected users.
+
+    - `interests` (comma list) — match ANY tag
+    - `lat`/`lng` — sort by distance ascending
+    - Requester's `blocked` list is excluded automatically when authenticated
+    - Requester's `interested_in` is applied automatically when set; can be overridden by `gender_filter`
+    """
     tag_filter = None
     if interests:
         tag_filter = {t.strip().lower() for t in interests.split(',') if t.strip()}
 
+    # Pull requester preferences if authenticated
+    session = await _resolve_session(request)
+    me = None
+    me_blocked = set()
+    me_interested_in = ''
+    if session:
+        me = await users_collection.find_one({'user_id': session['user_id']}, {'_id': 0})
+        if me:
+            me_blocked = set(me.get('blocked') or [])
+            me_interested_in = me.get('interested_in') or ''
+
+    # Explicit query override
+    if gender_filter in ('male', 'female', 'both', 'other'):
+        me_interested_in = gender_filter
+
     users = []
     for sid, user in active_connections.items():
+        # Don't show self
+        if me and user.get('user_id') == me.get('user_id'):
+            continue
+        # Skip blocked users
+        if user.get('user_id') and user['user_id'] in me_blocked:
+            continue
+
         user_city = user.get('city', 'Global')
         if city and city != 'Global' and user_city != city:
             continue
@@ -719,7 +783,11 @@ async def get_active_users(city: Optional[str] = None, interests: Optional[str] 
         if tag_filter and not (tag_filter & set(user_tags)):
             continue
 
-        users.append({
+        # Filter by preferred gender (skip filter if `both` / empty / unknown)
+        if me_interested_in in ('male', 'female') and user.get('gender') != me_interested_in:
+            continue
+
+        entry = {
             'sid': sid,
             'name': user.get('name', 'Anonymous'),
             'age': user.get('age', ''),
@@ -731,7 +799,18 @@ async def get_active_users(city: Optional[str] = None, interests: Optional[str] 
             'interested_in': user.get('interested_in') or '',
             'bio': user.get('bio') or '',
             'user_id': user.get('user_id'),
-        })
+            'stumble_id': user.get('stumble_id') or '',
+        }
+
+        # Distance if requester provided coords AND user shared them via socket
+        if lat is not None and lng is not None and user.get('lat') is not None and user.get('lng') is not None:
+            entry['distance_km'] = round(_haversine_km(lat, lng, user['lat'], user['lng']), 1)
+        users.append(entry)
+
+    # Sort: users with distance first (ascending), then others
+    if lat is not None and lng is not None:
+        users.sort(key=lambda u: u.get('distance_km', float('inf')))
+
     return {'users': users, 'count': len(users)}
 
 
@@ -779,6 +858,11 @@ async def profile_me(request: Request):
     profile.setdefault('interested_in', '')
     profile.setdefault('interests', [])
     profile.setdefault('images', [])
+    profile.setdefault('hotlist', [])
+    profile.setdefault('blocked', [])
+    profile.setdefault('telegram_id', '')
+    profile.setdefault('stumble_id', '')
+    profile['gender_locked'] = (profile.get('provider') == 'google' and bool(profile.get('gender')))
     return {'ok': True, 'profile': profile}
 
 
@@ -792,6 +876,10 @@ async def profile_update(request: Request):
     body = await request.json()
     user_id = session['user_id']
 
+    # Load current user record to check provider (gender is locked for Google users)
+    current = await users_collection.find_one({'user_id': user_id}, {'_id': 0})
+    is_google = (current or {}).get('provider') == 'google'
+
     # Whitelist of editable fields with light validation
     updates = {}
     if isinstance(body.get('name'), str):
@@ -799,7 +887,11 @@ async def profile_update(request: Request):
     if isinstance(body.get('bio'), str):
         updates['bio'] = body['bio'].strip()[:280]
     if body.get('gender') in ('male', 'female', 'other', ''):
-        updates['gender'] = body['gender']
+        if is_google and current.get('gender'):
+            # Google users keep the gender they first set — backend ignores further changes
+            pass
+        else:
+            updates['gender'] = body['gender']
     if body.get('interested_in') in ('male', 'female', 'both', ''):
         updates['interested_in'] = body['interested_in']
     if isinstance(body.get('interests'), list):
@@ -812,10 +904,12 @@ async def profile_update(request: Request):
                 cleaned.append(tag)
         updates['interests'] = cleaned[:10]  # cap at 10 tags
     if isinstance(body.get('images'), list):
-        # Store data-URLs as-is, cap to 5
         updates['images'] = [str(i) for i in body['images'] if isinstance(i, str)][:5]
     if isinstance(body.get('picture'), str):
         updates['picture'] = body['picture']
+    if isinstance(body.get('telegram_id'), str):
+        # Plain string, max 64 chars (Telegram usernames are 5-32 chars + leading @ optional)
+        updates['telegram_id'] = body['telegram_id'].strip()[:64]
 
     if not updates:
         return {'ok': True, 'message': 'No changes'}
@@ -832,6 +926,359 @@ async def profile_update(request: Request):
 
     profile = await users_collection.find_one({'user_id': user_id}, {'_id': 0})
     return {'ok': True, 'profile': profile}
+
+
+# ============================================
+# STUMBLE ID SEARCH
+# ============================================
+
+@app.get('/api/users/search')
+async def users_search(request: Request, stumble_id: Optional[str] = None):
+    """Look up a user by their @stumble_id (case-insensitive)."""
+    if not stumble_id:
+        return Response(status_code=400, content='{"ok": false, "message": "stumble_id required"}', media_type='application/json')
+
+    sid_norm = stumble_id.strip().lower()
+    if not sid_norm.startswith('@'):
+        sid_norm = '@' + sid_norm
+
+    found = await users_collection.find_one({'stumble_id': sid_norm}, {'_id': 0})
+    if not found:
+        return {'ok': True, 'user': None, 'online': False}
+
+    # Is this user currently online?
+    online = any((u.get('user_id') == found['user_id']) for u in active_connections.values())
+
+    public = {
+        'user_id': found['user_id'],
+        'name': found.get('name', ''),
+        'picture': found.get('picture', ''),
+        'bio': found.get('bio', ''),
+        'gender': found.get('gender', ''),
+        'interests': found.get('interests', []),
+        'stumble_id': found.get('stumble_id', ''),
+    }
+    return {'ok': True, 'user': public, 'online': online}
+
+
+# ============================================
+# BLOCK / UNBLOCK
+# ============================================
+
+@app.post('/api/block/{target_user_id}')
+async def block_user(target_user_id: str, request: Request):
+    session = await _resolve_session(request)
+    if not session:
+        return Response(status_code=401, content='{"ok": false, "message": "Auth required"}', media_type='application/json')
+    if target_user_id == session['user_id']:
+        return Response(status_code=400, content='{"ok": false, "message": "Cannot block self"}', media_type='application/json')
+
+    await users_collection.update_one(
+        {'user_id': session['user_id']},
+        {'$addToSet': {'blocked': target_user_id}},
+    )
+    return {'ok': True, 'blocked': target_user_id}
+
+
+@app.delete('/api/block/{target_user_id}')
+async def unblock_user(target_user_id: str, request: Request):
+    session = await _resolve_session(request)
+    if not session:
+        return Response(status_code=401, content='{"ok": false, "message": "Auth required"}', media_type='application/json')
+    await users_collection.update_one(
+        {'user_id': session['user_id']},
+        {'$pull': {'blocked': target_user_id}},
+    )
+    return {'ok': True, 'unblocked': target_user_id}
+
+
+@app.get('/api/blocked')
+async def list_blocked(request: Request):
+    session = await _resolve_session(request)
+    if not session:
+        return Response(status_code=401, content='{"ok": false, "message": "Auth required"}', media_type='application/json')
+    me = await users_collection.find_one({'user_id': session['user_id']}, {'_id': 0, 'blocked': 1})
+    blocked_ids = (me or {}).get('blocked', []) or []
+    if not blocked_ids:
+        return {'ok': True, 'users': []}
+    cursor = users_collection.find(
+        {'user_id': {'$in': blocked_ids}},
+        {'_id': 0, 'user_id': 1, 'name': 1, 'picture': 1, 'stumble_id': 1},
+    )
+    users = await cursor.to_list(length=200)
+    return {'ok': True, 'users': users}
+
+
+# ============================================
+# HOTLIST (pinned conversations — survive weekly auto-flush)
+# ============================================
+
+@app.post('/api/hotlist/{target_user_id}')
+async def hotlist_add(target_user_id: str, request: Request):
+    session = await _resolve_session(request)
+    if not session:
+        return Response(status_code=401, content='{"ok": false, "message": "Auth required"}', media_type='application/json')
+
+    await users_collection.update_one(
+        {'user_id': session['user_id']},
+        {'$addToSet': {'hotlist': target_user_id}},
+    )
+    # Re-pin all messages of that conversation so they survive the TTL purge
+    conv = conv_id_for(session['user_id'], target_user_id)
+    await messages_collection.update_many(
+        {'conv_id': conv},
+        {'$unset': {'expires_at': ''}, '$set': {'pinned': True}},
+    )
+    return {'ok': True, 'pinned': target_user_id}
+
+
+@app.delete('/api/hotlist/{target_user_id}')
+async def hotlist_remove(target_user_id: str, request: Request):
+    session = await _resolve_session(request)
+    if not session:
+        return Response(status_code=401, content='{"ok": false, "message": "Auth required"}', media_type='application/json')
+
+    await users_collection.update_one(
+        {'user_id': session['user_id']},
+        {'$pull': {'hotlist': target_user_id}},
+    )
+    # Re-apply TTL only if BOTH sides have unpinned (other user might still have it pinned)
+    other = await users_collection.find_one({'user_id': target_user_id}, {'_id': 0, 'hotlist': 1})
+    other_pins = set((other or {}).get('hotlist') or [])
+    if session['user_id'] not in other_pins:
+        # Re-arm TTL: expires 7 days from now
+        expires_at = datetime.now(timezone.utc) + timedelta(days=7)
+        conv = conv_id_for(session['user_id'], target_user_id)
+        await messages_collection.update_many(
+            {'conv_id': conv},
+            {'$set': {'expires_at': expires_at, 'pinned': False}},
+        )
+    return {'ok': True, 'unpinned': target_user_id}
+
+
+# ============================================
+# PERSISTENT MESSAGES (People-tab chats — saved to MongoDB, TTL 7 days unless hotlisted)
+# ============================================
+
+async def _public_user_brief(user_id: Optional[str]) -> Optional[dict]:
+    if not user_id:
+        return None
+    u = await users_collection.find_one({'user_id': user_id}, {'_id': 0})
+    if not u:
+        return None
+    return {
+        'user_id': u['user_id'],
+        'name': u.get('name', ''),
+        'picture': u.get('picture', ''),
+        'stumble_id': u.get('stumble_id', ''),
+    }
+
+
+@app.get('/api/conversations')
+async def list_conversations(request: Request):
+    """List my conversations (latest message per peer)."""
+    session = await _resolve_session(request)
+    if not session:
+        return Response(status_code=401, content='{"ok": false, "message": "Auth required"}', media_type='application/json')
+
+    me = session['user_id']
+    pipeline = [
+        {'$match': {'participants': me, 'deleted_for': {'$ne': me}}},
+        {'$sort': {'created_at': -1}},
+        {'$group': {
+            '_id': '$conv_id',
+            'last_message': {'$first': '$$ROOT'},
+            'unread_count': {
+                '$sum': {'$cond': [
+                    {'$and': [
+                        {'$ne': ['$sender_id', me]},
+                        {'$not': {'$in': [me, {'$ifNull': ['$read_by', []]}]}}
+                    ]},
+                    1, 0
+                ]}
+            },
+        }},
+        {'$sort': {'last_message.created_at': -1}},
+        {'$limit': 100},
+    ]
+    raw = await messages_collection.aggregate(pipeline).to_list(length=100)
+
+    items = []
+    for r in raw:
+        lm = r['last_message']
+        peer_id = next((p for p in lm['participants'] if p != me), None)
+        peer = await _public_user_brief(peer_id)
+        if not peer:
+            continue
+        my_user = await users_collection.find_one({'user_id': me}, {'_id': 0, 'hotlist': 1})
+        items.append({
+            'conv_id': r['_id'],
+            'peer': peer,
+            'pinned': peer_id in (my_user.get('hotlist') or []),
+            'unread_count': r.get('unread_count', 0),
+            'last_message': {
+                'message_id': lm['message_id'],
+                'text': lm.get('text', ''),
+                'has_photo': bool(lm.get('photo_url') or lm.get('photo_data')),
+                'sender_id': lm['sender_id'],
+                'created_at': lm['created_at'].isoformat() if isinstance(lm.get('created_at'), datetime) else lm.get('created_at'),
+                'deleted_for_everyone': lm.get('deleted_for_everyone', False),
+            },
+        })
+    return {'ok': True, 'conversations': items}
+
+
+@app.get('/api/conversations/{peer_user_id}/messages')
+async def get_messages(peer_user_id: str, request: Request, limit: int = 50, before: Optional[str] = None):
+    session = await _resolve_session(request)
+    if not session:
+        return Response(status_code=401, content='{"ok": false, "message": "Auth required"}', media_type='application/json')
+
+    me = session['user_id']
+    conv = conv_id_for(me, peer_user_id)
+    q = {'conv_id': conv, 'deleted_for': {'$ne': me}}
+    if before:
+        try:
+            q['created_at'] = {'$lt': datetime.fromisoformat(before)}
+        except Exception:
+            pass
+
+    cursor = messages_collection.find(q, {'_id': 0}).sort('created_at', -1).limit(min(limit, 200))
+    items = await cursor.to_list(length=limit)
+    # Mark as read
+    await messages_collection.update_many(
+        {'conv_id': conv, 'sender_id': peer_user_id},
+        {'$addToSet': {'read_by': me}},
+    )
+    items.reverse()  # oldest first
+    # Convert datetime objects
+    for m in items:
+        if isinstance(m.get('created_at'), datetime):
+            m['created_at'] = m['created_at'].isoformat()
+        if isinstance(m.get('expires_at'), datetime):
+            m['expires_at'] = m['expires_at'].isoformat()
+    return {'ok': True, 'messages': items, 'conv_id': conv}
+
+
+@app.post('/api/conversations/{peer_user_id}/messages')
+async def send_message(peer_user_id: str, request: Request):
+    session = await _resolve_session(request)
+    if not session:
+        return Response(status_code=401, content='{"ok": false, "message": "Auth required"}', media_type='application/json')
+
+    body = await request.json()
+    text = (body.get('text') or '').strip()
+    photo_data = body.get('photo')  # data: URL
+
+    if not text and not photo_data:
+        return Response(status_code=400, content='{"ok": false, "message": "Empty message"}', media_type='application/json')
+
+    me = session['user_id']
+
+    # Check if peer has blocked me
+    peer_doc = await users_collection.find_one({'user_id': peer_user_id}, {'_id': 0, 'blocked': 1, 'hotlist': 1})
+    if peer_doc is None:
+        return Response(status_code=404, content='{"ok": false, "message": "User not found"}', media_type='application/json')
+    if me in (peer_doc.get('blocked') or []):
+        return Response(status_code=403, content='{"ok": false, "message": "Cannot message this user"}', media_type='application/json')
+
+    # Check if I blocked them
+    my_doc = await users_collection.find_one({'user_id': me}, {'_id': 0, 'blocked': 1, 'hotlist': 1})
+    if peer_user_id in ((my_doc or {}).get('blocked') or []):
+        return Response(status_code=403, content='{"ok": false, "message": "Unblock to send messages"}', media_type='application/json')
+
+    conv = conv_id_for(me, peer_user_id)
+    now = datetime.now(timezone.utc)
+    # Pinned if either side has the other in hotlist
+    pinned = (peer_user_id in ((my_doc or {}).get('hotlist') or [])) or (me in (peer_doc.get('hotlist') or []))
+
+    msg = {
+        'message_id': f"msg_{secrets.token_hex(8)}",
+        'conv_id': conv,
+        'participants': sorted([me, peer_user_id]),
+        'sender_id': me,
+        'recipient_id': peer_user_id,
+        'text': text[:2000],
+        'photo_data': photo_data[:1_000_000] if isinstance(photo_data, str) else None,
+        'created_at': now,
+        'read_by': [me],
+        'deleted_for': [],
+        'deleted_for_everyone': False,
+        'pinned': pinned,
+    }
+    if not pinned:
+        msg['expires_at'] = now + timedelta(days=7)
+
+    await messages_collection.insert_one(msg)
+
+    # Real-time push to peer if they are online
+    peer_sids = [sid for sid, u in active_connections.items() if u.get('user_id') == peer_user_id]
+    payload = {
+        'message_id': msg['message_id'],
+        'conv_id': conv,
+        'sender_id': me,
+        'text': msg['text'],
+        'photo_data': msg['photo_data'],
+        'created_at': now.isoformat(),
+    }
+    for psid in peer_sids:
+        await sio.emit('direct_message', payload, room=psid)
+
+    return {'ok': True, 'message': {**payload, 'pinned': pinned}}
+
+
+@app.delete('/api/conversations/{peer_user_id}/messages/{message_id}')
+async def delete_message(peer_user_id: str, message_id: str, request: Request, for_everyone: bool = False):
+    """Delete a single message. for_everyone=true removes content for both sides (sender only)."""
+    session = await _resolve_session(request)
+    if not session:
+        return Response(status_code=401, content='{"ok": false, "message": "Auth required"}', media_type='application/json')
+
+    me = session['user_id']
+    conv = conv_id_for(me, peer_user_id)
+    msg = await messages_collection.find_one({'message_id': message_id, 'conv_id': conv}, {'_id': 0})
+    if not msg:
+        return Response(status_code=404, content='{"ok": false, "message": "Not found"}', media_type='application/json')
+
+    if for_everyone:
+        if msg['sender_id'] != me:
+            return Response(status_code=403, content='{"ok": false, "message": "Only the sender can delete for everyone"}', media_type='application/json')
+        await messages_collection.update_one(
+            {'message_id': message_id},
+            {'$set': {'deleted_for_everyone': True, 'text': '', 'photo_data': None}},
+        )
+        # Notify peer in real time
+        peer_sids = [sid for sid, u in active_connections.items() if u.get('user_id') == peer_user_id]
+        for psid in peer_sids:
+            await sio.emit('message_deleted', {'message_id': message_id, 'conv_id': conv, 'for_everyone': True}, room=psid)
+    else:
+        await messages_collection.update_one(
+            {'message_id': message_id},
+            {'$addToSet': {'deleted_for': me}},
+        )
+    return {'ok': True}
+
+
+@app.delete('/api/conversations/{peer_user_id}')
+async def delete_conversation(peer_user_id: str, request: Request, for_everyone: bool = False):
+    """Clear a whole conversation thread."""
+    session = await _resolve_session(request)
+    if not session:
+        return Response(status_code=401, content='{"ok": false, "message": "Auth required"}', media_type='application/json')
+
+    me = session['user_id']
+    conv = conv_id_for(me, peer_user_id)
+    if for_everyone:
+        await messages_collection.delete_many({'conv_id': conv})
+        peer_sids = [sid for sid, u in active_connections.items() if u.get('user_id') == peer_user_id]
+        for psid in peer_sids:
+            await sio.emit('conversation_cleared', {'conv_id': conv, 'by_user_id': me}, room=psid)
+    else:
+        await messages_collection.update_many(
+            {'conv_id': conv},
+            {'$addToSet': {'deleted_for': me}},
+        )
+    return {'ok': True}
 
 # Socket.IO events
 @sio.event
@@ -936,9 +1383,12 @@ async def handle_register_user(sid, data):
         'user_id': (auth_user or {}).get('user_id'),
         'email': (auth_user or {}).get('email'),
         'picture': (auth_user or {}).get('picture'),
+        'stumble_id': (auth_user or {}).get('stumble_id') or '',
         'interests': data.get('interests', []) or [],
         'interested_in': data.get('interested_in', ''),
         'bio': data.get('bio', ''),
+        'lat': data.get('lat'),
+        'lng': data.get('lng'),
     }
     
     city_users[city] = city_users.get(city, 0) + 1

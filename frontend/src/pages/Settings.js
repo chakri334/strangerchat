@@ -1,154 +1,214 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Ban, Send, Save, AtSign, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import useSEO from '../hooks/useSEO';
+import { apiJSON } from '../utils/api';
 
-const CITIES = [
-  'Global','Mumbai','Delhi','Bangalore','Hyderabad','Chennai','Kolkata','Pune','Ahmedabad',
-  'New York','Los Angeles','Chicago','Houston','Phoenix','Philadelphia','San Antonio',
-  'London','Manchester','Birmingham','Leeds','Glasgow',
-  'Toronto','Vancouver','Montreal','Calgary',
-  'Sydney','Melbourne','Brisbane','Perth',
-  'Dubai','Abu Dhabi','Riyadh','Doha',
-  'Singapore','Kuala Lumpur','Jakarta','Bangkok','Manila','Ho Chi Minh City',
-  'Tokyo','Seoul','Shanghai','Beijing','Hong Kong',
-  'Paris','Berlin','Madrid','Rome','Amsterdam','Brussels','Vienna','Stockholm',
-  'São Paulo','Mexico City','Buenos Aires','Bogotá','Lima',
-  'Lagos','Nairobi','Cairo','Johannesburg','Accra',
-];
+const Section = ({ title, hint, children }) => (
+  <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-4 space-y-3">
+    <div>
+      <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300">{title}</h3>
+      {hint && <p className="text-[10px] text-slate-500 mt-0.5">{hint}</p>}
+    </div>
+    {children}
+  </div>
+);
 
 const Settings = () => {
   const navigate = useNavigate();
-  const [name, setName]               = useState('');
-  const [age, setAge]                 = useState('');
-  const [gender, setGender]           = useState('');
-  const [city, setCity]               = useState('Global');
-  const [genderLocked, setGenderLocked] = useState(false);
-  const [authMethod, setAuthMethod] = useState('email');
-  const [accountEmail, setAccountEmail] = useState('');
+  const [profile, setProfile] = useState(null);
+  const [telegramId, setTelegramId] = useState('');
+  const [name, setName] = useState('');
+  const [blocked, setBlocked] = useState([]);
+  const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useSEO({
     title: 'Settings',
-    description: 'Update your Stumble Chat display name, age, gender, and city preferences.',
+    description: 'Manage your Stumble Chat profile, Telegram link and blocked users.',
     canonical: '/settings',
     noIndex: true,
   });
 
-  useEffect(() => {
-    setName(localStorage.getItem('userName') || '');
-    setAge(localStorage.getItem('userAge') || '');
-    setGender(localStorage.getItem('userGender') || '');
-    setCity(localStorage.getItem('userCity') || 'Global');
-    setGenderLocked(!!localStorage.getItem('userGender'));
-    setAuthMethod(localStorage.getItem('authMethod') || 'email');
-    setAccountEmail(localStorage.getItem('accountEmail') || '');
+  const load = useCallback(async () => {
+    setLoading(true);
+    const [profRes, blockedRes] = await Promise.all([
+      apiJSON('/api/profile/me'),
+      apiJSON('/api/blocked'),
+    ]);
+    if (profRes.ok && profRes.data?.profile) {
+      const p = profRes.data.profile;
+      setProfile(p);
+      setName(p.name || '');
+      setTelegramId(p.telegram_id || '');
+    }
+    if (blockedRes.ok && blockedRes.data?.users) {
+      setBlocked(blockedRes.data.users);
+    }
+    setLoading(false);
   }, []);
 
-  const handleSave = () => {
-    if (!name.trim()) { toast.error('Please enter a display name'); return; }
-    if (!accountEmail.trim()) { toast.error('Please enter your email'); return; }
-    localStorage.setItem('userName', name.trim());
-    localStorage.setItem('authMethod', authMethod);
-    localStorage.setItem('accountEmail', accountEmail.trim());
-    localStorage.setItem('userAge', age);
-    localStorage.setItem('userCity', city);
-    if (!genderLocked && gender) {
-      localStorage.setItem('userGender', gender);
-      setGenderLocked(true);
-      toast.success('Settings saved! Gender is now locked.');
-    } else if (genderLocked) {
-      toast.info('Gender is locked.');
-    } else {
-      toast.success('Settings saved!');
+  useEffect(() => { load(); }, [load]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    const { ok, data } = await apiJSON('/api/profile/me', {
+      method: 'PUT',
+      body: JSON.stringify({ name, telegram_id: telegramId }),
+    });
+    setSaving(false);
+    if (!ok || !data?.ok) {
+      toast.error(data?.message || 'Save failed');
+      return;
     }
-    setTimeout(() => navigate('/'), 500);
+    setProfile(data.profile);
+    if (name) localStorage.setItem('userName', name);
+    toast.success('Settings saved');
+  };
+
+  const handleUnblock = async (userId) => {
+    const { ok } = await apiJSON(`/api/block/${userId}`, { method: 'DELETE' });
+    if (ok) {
+      setBlocked((prev) => prev.filter((u) => u.user_id !== userId));
+      toast.success('Unblocked');
+    }
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-white pb-20" data-testid="settings-page">
-      <header className="p-6 flex items-center gap-4 border-b border-white/10">
-        <button onClick={() => navigate('/')} className="p-2 rounded-full hover:bg-white/5 transition-colors" data-testid="back-button">
-          <ArrowLeft size={24} />
+    <div className="min-h-screen bg-slate-950 text-slate-100 pb-12" data-testid="settings-page">
+      <header className="sticky top-0 z-10 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 px-4 py-3 flex items-center gap-3">
+        <button onClick={() => navigate('/')} className="p-2 rounded-lg hover:bg-slate-800" data-testid="back-button">
+          <ArrowLeft size={18} />
         </button>
-        <h1 className="text-2xl font-bold" style={{ fontFamily: 'Syne, sans-serif' }}>Settings</h1>
+        <h1 className="text-base font-bold" style={{ fontFamily: 'Syne, sans-serif' }}>Settings</h1>
       </header>
 
-      <div className="p-6 max-w-2xl mx-auto space-y-6">
-        {/* Display Name */}
-        <div>
-          <label className="block text-sm text-gray-400 mb-2">Display Name</label>
-          <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Enter your name"
-            className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#7c5cfc] transition-all"
-            data-testid="name-input" />
-        </div>
+      <div className="p-4 max-w-2xl mx-auto space-y-4">
+        {loading && <div className="text-center py-12 text-slate-500 text-sm">Loading…</div>}
 
-        {/* Age */}
-        <div>
-          <label className="block text-sm text-gray-400 mb-2">Age (Optional)</label>
-          <input type="number" value={age} onChange={(e) => setAge(e.target.value)} placeholder="Enter your age"
-            className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#7c5cfc] transition-all"
-            data-testid="age-input" />
-        </div>
+        {!loading && !profile && (
+          <Section title="Not signed in">
+            <p className="text-sm text-slate-300">Settings are only available for signed-in users. Guests can use Random Chat from the home page.</p>
+          </Section>
+        )}
 
-        {/* Gender */}
-        <div>
-          <label className="block text-sm text-gray-400 mb-2">
-            Gender {genderLocked && <span className="text-xs text-[#fc5c7d]">(Locked)</span>}
-          </label>
-          <div className="grid grid-cols-3 gap-3">
-            {['Male', 'Female', 'Other'].map((g) => (
-              <button key={g} onClick={() => !genderLocked && setGender(g)} disabled={genderLocked}
-                className={`py-3 rounded-xl font-medium transition-all ${gender === g ? 'bg-gradient-to-r from-[#7c5cfc] to-[#fc5c7d] text-white' : 'bg-white/5 text-gray-300 hover:bg-white/10'} ${genderLocked ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                {g}
-              </button>
-            ))}
-          </div>
-          {genderLocked && <p className="text-xs text-gray-500 mt-2">Gender can only be set once to maintain honest connections.</p>}
-        </div>
+        {!loading && profile && (
+          <>
+            <Section title="Identity">
+              <div className="flex items-center gap-3">
+                {profile.picture ? (
+                  <img src={profile.picture} alt={profile.name} className="h-12 w-12 rounded-2xl object-cover" />
+                ) : (
+                  <div className="h-12 w-12 rounded-2xl bg-gradient-to-tr from-[#7c5cfc] to-emerald-400 flex items-center justify-center text-xl">😊</div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <div className="font-bold text-white truncate">{profile.name}</div>
+                  <div className="text-[10px] text-slate-400 truncate">{profile.email}</div>
+                  {profile.stumble_id && (
+                    <div className="flex items-center gap-1 text-[11px] text-emerald-400 font-mono mt-1">
+                      <AtSign size={10} />
+                      <span data-testid="settings-stumble-id">{profile.stumble_id}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </Section>
 
+            <Section title="Display name">
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                maxLength={60}
+                className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2.5 text-sm text-white focus:border-emerald-500 focus:outline-none"
+                data-testid="settings-name-input"
+              />
+            </Section>
 
+            <Section
+              title="Telegram link"
+              hint="Optional. Used by our bot for notifications and Telegram account linking."
+            >
+              <div className="relative">
+                <Send className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-sky-400" />
+                <input
+                  value={telegramId}
+                  onChange={(e) => setTelegramId(e.target.value)}
+                  placeholder="@your_telegram_username"
+                  maxLength={64}
+                  className="w-full rounded-xl border border-slate-800 bg-slate-950 pl-9 pr-3 py-2.5 text-sm text-white placeholder-slate-600 focus:border-emerald-500 focus:outline-none"
+                  data-testid="settings-telegram-id-input"
+                />
+              </div>
+            </Section>
 
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="w-full flex items-center justify-center gap-2 rounded-2xl bg-emerald-500 text-slate-950 hover:bg-emerald-400 disabled:opacity-50 font-bold py-3 text-xs uppercase tracking-wider"
+              data-testid="settings-save-btn"
+            >
+              <Save size={14} />
+              {saving ? 'Saving…' : 'Save'}
+            </button>
 
-        {/* Account */}
-        <div>
-          <label className="block text-sm text-gray-400 mb-2">Create / Access Account</label>
-          <div className="grid grid-cols-2 gap-3 mb-3">
-            {['email', 'google'].map((method) => (
-              <button key={method} onClick={() => setAuthMethod(method)}
-                className={`py-3 rounded-xl font-medium transition-all ${authMethod === method ? 'bg-gradient-to-r from-[#7c5cfc] to-[#fc5c7d] text-white' : 'bg-white/5 text-gray-300 hover:bg-white/10'}`}>
-                {method === 'google' ? 'Google Account' : 'Email Account'}
-              </button>
-            ))}
-          </div>
-          <input type="email" value={accountEmail} onChange={(e) => setAccountEmail(e.target.value)}
-            placeholder={authMethod === 'google' ? 'Google email' : 'Email address'}
-            className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#7c5cfc] transition-all" />
-          <p className="text-xs text-gray-500 mt-2">Your selected account is saved on this device so you can access and use it later.</p>
-        </div>
-        {/* Save */}
-        <button onClick={handleSave} data-testid="save-button"
-          className="w-full py-4 rounded-xl font-bold text-lg bg-gradient-to-r from-[#7c5cfc] to-[#fc5c7d] hover:opacity-90 transition-all">
-          Save Settings
-        </button>
+            <Section
+              title={`Blocked users (${blocked.length})`}
+              hint="Blocked users can't message you. Unblock anyone here."
+            >
+              {blocked.length === 0 ? (
+                <div className="flex items-center justify-center py-6 text-center">
+                  <div>
+                    <Ban size={20} className="text-slate-600 mx-auto mb-2" />
+                    <p className="text-[11px] text-slate-500">No one is blocked.</p>
+                  </div>
+                </div>
+              ) : (
+                <ul className="space-y-2" data-testid="blocked-list">
+                  {blocked.map((u) => (
+                    <li key={u.user_id} className="flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-950 p-2.5">
+                      {u.picture ? (
+                        <img src={u.picture} alt={u.name} className="h-9 w-9 rounded-full object-cover" />
+                      ) : (
+                        <div className="h-9 w-9 rounded-full bg-slate-800 flex items-center justify-center text-base">😶</div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-sm truncate">{u.name}</div>
+                        <div className="text-[10px] font-mono text-slate-500 truncate">{u.stumble_id}</div>
+                      </div>
+                      <button
+                        onClick={() => handleUnblock(u.user_id)}
+                        className="rounded-lg bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25 px-3 py-1.5 text-[11px] font-bold uppercase"
+                        data-testid={`unblock-${u.user_id}`}
+                      >
+                        Unblock
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Section>
+          </>
+        )}
 
-        {/* Legal links */}
-        <div className="pt-4 border-t border-white/10">
-          <p className="text-xs text-gray-500 text-center mb-3">Legal</p>
+        <Section title="Legal">
           <div className="grid grid-cols-2 gap-2">
             {[
               { label: 'Terms & Conditions', path: '/terms' },
-              { label: 'Privacy Policy',     path: '/privacy' },
-              { label: 'Cookie Policy',      path: '/cookies' },
+              { label: 'Privacy Policy', path: '/privacy' },
+              { label: 'Cookie Policy', path: '/cookies' },
               { label: 'Community Guidelines', path: '/guidelines' },
             ].map(({ label, path }) => (
-              <button key={path} onClick={() => navigate(path)}
-                className="py-2 px-3 text-xs text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-lg transition-all text-left">
+              <button
+                key={path}
+                onClick={() => navigate(path)}
+                className="py-2 px-3 text-xs text-slate-400 hover:text-white bg-slate-900 hover:bg-slate-800 rounded-lg text-left border border-slate-800"
+              >
                 {label}
               </button>
             ))}
           </div>
-        </div>
+        </Section>
       </div>
     </div>
   );
