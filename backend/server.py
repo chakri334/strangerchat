@@ -702,21 +702,130 @@ async def get_stats():
     }
 
 @app.get('/api/active-users')
-async def get_active_users(city: Optional[str] = None):
+async def get_active_users(city: Optional[str] = None, interests: Optional[str] = None):
+    """List currently-connected users. Optional `interests` is a comma-separated
+    list — users matching ANY of those tags will be returned."""
+    tag_filter = None
+    if interests:
+        tag_filter = {t.strip().lower() for t in interests.split(',') if t.strip()}
+
     users = []
     for sid, user in active_connections.items():
         user_city = user.get('city', 'Global')
         if city and city != 'Global' and user_city != city:
             continue
+
+        user_tags = [t.lower() for t in (user.get('interests') or [])]
+        if tag_filter and not (tag_filter & set(user_tags)):
+            continue
+
         users.append({
             'sid': sid,
             'name': user.get('name', 'Anonymous'),
             'age': user.get('age', ''),
             'gender': user.get('gender', ''),
             'city': user_city,
-            'emoji': user.get('emoji', '😊')
+            'emoji': user.get('emoji', '😊'),
+            'picture': user.get('picture') or '',
+            'interests': user.get('interests') or [],
+            'interested_in': user.get('interested_in') or '',
+            'bio': user.get('bio') or '',
+            'user_id': user.get('user_id'),
         })
     return {'users': users, 'count': len(users)}
+
+
+# ============================================
+# PROFILE ENDPOINTS — bio, gender, interestedIn, interests, images
+# ============================================
+
+async def _resolve_session(request: Request) -> Optional[dict]:
+    """Pull the current session from cookie or Authorization header."""
+    token = request.cookies.get('session_token')
+    if not token:
+        auth = request.headers.get('Authorization', '')
+        if auth.startswith('Bearer '):
+            token = auth[7:]
+    if not token:
+        return None
+    session = user_sessions.get(token)
+    if session:
+        return session
+    db_session = await sessions_collection.find_one({'session_token': token}, {'_id': 0})
+    if not db_session:
+        return None
+    return {
+        'user_id': db_session['user_id'],
+        'email': db_session.get('email'),
+        'name': db_session.get('name'),
+        'picture': db_session.get('picture', ''),
+    }
+
+
+@app.get('/api/profile/me')
+async def profile_me(request: Request):
+    """Return the authenticated user's full profile."""
+    session = await _resolve_session(request)
+    if not session:
+        return Response(status_code=401, content='{"ok": false, "message": "Not authenticated"}', media_type='application/json')
+
+    profile = await users_collection.find_one({'user_id': session['user_id']}, {'_id': 0})
+    if not profile:
+        return Response(status_code=404, content='{"ok": false, "message": "Profile not found"}', media_type='application/json')
+
+    # Defaults for new optional fields
+    profile.setdefault('bio', '')
+    profile.setdefault('gender', '')
+    profile.setdefault('interested_in', '')
+    profile.setdefault('interests', [])
+    profile.setdefault('images', [])
+    return {'ok': True, 'profile': profile}
+
+
+@app.put('/api/profile/me')
+async def profile_update(request: Request):
+    """Update the authenticated user's profile fields."""
+    session = await _resolve_session(request)
+    if not session:
+        return Response(status_code=401, content='{"ok": false, "message": "Not authenticated"}', media_type='application/json')
+
+    body = await request.json()
+    user_id = session['user_id']
+
+    # Whitelist of editable fields with light validation
+    updates = {}
+    if isinstance(body.get('name'), str):
+        updates['name'] = body['name'].strip()[:60]
+    if isinstance(body.get('bio'), str):
+        updates['bio'] = body['bio'].strip()[:280]
+    if body.get('gender') in ('male', 'female', 'other', ''):
+        updates['gender'] = body['gender']
+    if body.get('interested_in') in ('male', 'female', 'both', ''):
+        updates['interested_in'] = body['interested_in']
+    if isinstance(body.get('interests'), list):
+        cleaned = [str(t).strip().lower()[:30] for t in body['interests'] if str(t).strip()]
+        updates['interests'] = cleaned[:10]  # cap at 10 tags
+    if isinstance(body.get('images'), list):
+        # Store data-URLs as-is, cap to 5
+        updates['images'] = [str(i) for i in body['images'] if isinstance(i, str)][:5]
+    if isinstance(body.get('picture'), str):
+        updates['picture'] = body['picture']
+
+    if not updates:
+        return {'ok': True, 'message': 'No changes'}
+
+    updates['updated_at'] = datetime.now(timezone.utc).isoformat()
+    await users_collection.update_one({'user_id': user_id}, {'$set': updates})
+
+    # Sync in-memory mirrors
+    if user_id in users_db:
+        users_db[user_id].update(updates)
+    for sess in user_sessions.values():
+        if sess.get('user_id') == user_id and 'name' in updates:
+            sess['name'] = updates['name']
+
+    profile = await users_collection.find_one({'user_id': user_id}, {'_id': 0})
+    return {'ok': True, 'profile': profile}
 
 # Socket.IO events
 @sio.event
@@ -820,6 +929,10 @@ async def handle_register_user(sid, data):
         'emoji': secrets.choice(['😊', '😎', '🤗', '😺', '🦊', '🐼', '🦄', '🌟']),
         'user_id': (auth_user or {}).get('user_id'),
         'email': (auth_user or {}).get('email'),
+        'picture': (auth_user or {}).get('picture'),
+        'interests': data.get('interests', []) or [],
+        'interested_in': data.get('interested_in', ''),
+        'bio': data.get('bio', ''),
     }
     
     city_users[city] = city_users.get(city, 0) + 1
