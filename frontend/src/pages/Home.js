@@ -360,7 +360,7 @@ const Home = () => {
             onGoPeople={() => setActiveTab('people')}
           />
         )}
-        {activeTab === 'profile' && <ProfileTab onSaved={handleProfileSaved} />}
+        {activeTab === 'profile' && <ProfileTab onSaved={handleProfileSaved} onOpenChat={openDirectChat} />}
       </main>
 
       <BottomTabBar activeTab={activeTab} onChange={setActiveTab} />

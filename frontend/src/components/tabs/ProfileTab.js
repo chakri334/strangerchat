@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Save, X, Plus, Copy, AtSign, Send, Camera, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { apiJSON, apiFetch } from '../../utils/api';
+import HotlistSection from './HotlistSection';
+import ImageGallery from './ImageGallery';
 
 const GENDER_OPTIONS = [
   { value: '', label: 'Prefer not to say' },
@@ -43,7 +45,7 @@ const Pill = ({ active, disabled, children, onClick, testid }) => (
   </button>
 );
 
-const ProfileTab = ({ onSaved }) => {
+const ProfileTab = ({ onSaved, onOpenChat }) => {
   const [profile, setProfile] = useState(null);
   const [name, setName] = useState('');
   const [bio, setBio] = useState('');
@@ -55,6 +57,8 @@ const ProfileTab = ({ onSaved }) => {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [uploadingPic, setUploadingPic] = useState(false);
+  const [images, setImages] = useState([]);
+  const [hotlistRefresh, setHotlistRefresh] = useState(0);
   const fileInputRef = useRef(null);
 
   const load = useCallback(async () => {
@@ -68,6 +72,7 @@ const ProfileTab = ({ onSaved }) => {
     setInterestedIn(p.interested_in || '');
     setInterests(p.interests || []);
     setTelegramId(p.telegram_id || '');
+    setImages(p.images || []);
     setLoading(false);
   }, []);
 
@@ -312,6 +317,8 @@ const ProfileTab = ({ onSaved }) => {
         <Save size={14} />
         {saving ? 'Saving…' : 'Save profile'}
       </button>
+
+      <HotlistSection onOpenChat={onOpenChat} refreshKey={hotlistRefresh} />
     </div>
   );
 };
