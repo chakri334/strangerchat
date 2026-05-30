@@ -959,6 +959,59 @@ async def profile_update(request: Request):
 
 
 # ============================================
+# PROFILE PICTURE UPLOAD
+# ============================================
+import base64 as _b64
+from fastapi import UploadFile, File
+
+ALLOWED_PIC_TYPES = {'image/jpeg', 'image/png', 'image/webp', 'image/gif'}
+MAX_PIC_BYTES = 2 * 1024 * 1024  # 2 MB
+
+
+@app.post('/api/profile/picture')
+async def upload_profile_picture(request: Request, file: UploadFile = File(...)):
+    """Accept a multipart image, store as data URL in user.picture.
+    Constraints: max 2MB, jpeg/png/webp/gif only."""
+    session = await _resolve_session(request)
+    if not session:
+        return Response(status_code=401, content='{"ok": false, "message": "Auth required"}', media_type='application/json')
+
+    if file.content_type not in ALLOWED_PIC_TYPES:
+        return Response(status_code=400, content='{"ok": false, "message": "Only JPEG, PNG, WebP or GIF images are allowed"}', media_type='application/json')
+
+    data = await file.read()
+    if len(data) > MAX_PIC_BYTES:
+        return Response(status_code=413, content='{"ok": false, "message": "File too large (max 2MB)"}', media_type='application/json')
+    if len(data) == 0:
+        return Response(status_code=400, content='{"ok": false, "message": "Empty file"}', media_type='application/json')
+
+    b64 = _b64.b64encode(data).decode('ascii')
+    data_url = f"data:{file.content_type};base64,{b64}"
+
+    user_id = session['user_id']
+    await users_collection.update_one(
+        {'user_id': user_id},
+        {'$set': {'picture': data_url, 'updated_at': datetime.now(timezone.utc).isoformat()}},
+    )
+    return {'ok': True, 'picture': data_url}
+
+
+@app.delete('/api/profile/picture')
+async def delete_profile_picture(request: Request):
+    """Reset the user's avatar to empty."""
+    session = await _resolve_session(request)
+    if not session:
+        return Response(status_code=401, content='{"ok": false, "message": "Auth required"}', media_type='application/json')
+
+    await users_collection.update_one(
+        {'user_id': session['user_id']},
+        {'$set': {'picture': ''}},
+    )
+    return {'ok': True}
+
+
+
+# ============================================
 # STUMBLE ID SEARCH
 # ============================================
 

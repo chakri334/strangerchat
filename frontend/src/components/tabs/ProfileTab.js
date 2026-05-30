@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Save, X, Plus, Copy, AtSign, Send } from 'lucide-react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { Save, X, Plus, Copy, AtSign, Send, Camera, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { apiJSON } from '../../utils/api';
+import { apiJSON, apiFetch } from '../../utils/api';
 
 const GENDER_OPTIONS = [
   { value: '', label: 'Prefer not to say' },
@@ -101,6 +101,41 @@ const ProfileTab = ({ onSaved }) => {
     toast.success('Stumble ID copied');
   };
 
+  const handlePictureChange = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.type)) {
+      toast.error('JPEG, PNG, WebP or GIF only');
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('Image too large (max 2MB)');
+      return;
+    }
+    setUploadingPic(true);
+    const fd = new FormData();
+    fd.append('file', file);
+    const res = await apiFetch('/api/profile/picture', { method: 'POST', body: fd });
+    const data = await res.json().catch(() => ({}));
+    setUploadingPic(false);
+    if (!res.ok || !data.ok) {
+      toast.error(data.message || 'Upload failed');
+      return;
+    }
+    setProfile((p) => ({ ...p, picture: data.picture }));
+    toast.success('Picture updated');
+  };
+
+  const handleRemovePicture = async () => {
+    if (!window.confirm('Remove your profile picture?')) return;
+    const { ok } = await apiJSON('/api/profile/picture', { method: 'DELETE' });
+    if (ok) {
+      setProfile((p) => ({ ...p, picture: '' }));
+      toast.success('Picture removed');
+    }
+  };
+
   if (loading) {
     return <div className="flex-1 flex items-center justify-center p-6"><div className="text-slate-400 text-sm">Loading profile…</div></div>;
   }
@@ -114,19 +149,51 @@ const ProfileTab = ({ onSaved }) => {
   return (
     <div className="flex-1 overflow-y-auto px-4 py-4 space-y-5" data-testid="profile-tab">
       <div className="flex items-center gap-3">
-        {profile.picture ? (
-          <img src={profile.picture} alt={profile.name} className="h-14 w-14 rounded-2xl object-cover border border-slate-800" />
-        ) : (
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-tr from-[#7c5cfc] to-emerald-400 text-3xl shadow-lg shadow-emerald-500/10 select-none">
-            😊
-          </div>
-        )}
+        <div className="relative group">
+          {profile.picture ? (
+            <img src={profile.picture} alt={profile.name} className="h-16 w-16 rounded-2xl object-cover border border-slate-800" />
+          ) : (
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-tr from-[#7c5cfc] to-emerald-400 text-3xl shadow-lg shadow-emerald-500/10 select-none">
+              😊
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploadingPic}
+            className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500 text-slate-950 hover:bg-emerald-400 border-2 border-slate-950 shadow-md disabled:opacity-50"
+            data-testid="upload-picture-btn"
+            title="Upload picture"
+          >
+            <Camera size={12} />
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/gif"
+            onChange={handlePictureChange}
+            className="hidden"
+            data-testid="picture-file-input"
+          />
+        </div>
         <div className="flex-1 min-w-0">
           <h2 className="text-lg font-bold text-white truncate" style={{ fontFamily: 'Syne, sans-serif' }}>
             {profile.name || 'Your profile'}
           </h2>
           <p className="text-[11px] text-slate-400 truncate">{profile.email}</p>
-          <p className="text-[10px] text-slate-500 mt-0.5">Signed in via {profile.provider || 'email'}</p>
+          <div className="flex items-center gap-2 mt-0.5">
+            <p className="text-[10px] text-slate-500">Signed in via {profile.provider || 'email'}</p>
+            {profile.picture && (
+              <button
+                onClick={handleRemovePicture}
+                className="text-[10px] text-red-400 hover:text-red-300 flex items-center gap-0.5"
+                data-testid="remove-picture-btn"
+              >
+                <Trash2 size={9} /> remove
+              </button>
+            )}
+            {uploadingPic && <span className="text-[10px] text-emerald-400 animate-pulse">Uploading…</span>}
+          </div>
         </div>
       </div>
 

@@ -1,0 +1,47 @@
+{
+  "summary": "Iteration 6 — Profile picture (upload/delete), legal pages restyle (privacy/terms/cookies/guidelines), and WSS polling-first verification. BACKEND: 13/13 picture tests pass (POST/DELETE /api/profile/picture with all edge cases: 401 no-auth, 400 wrong type, 400 empty, 413 >2MB, full GET round-trip). 6 regression smoke tests pass (/api/profile/me, /api/conversations, /api/users/search, /api/blocked, /api/active-users, hotlist toggle). FRONTEND: All four legal pages (/privacy, /terms, /cookies, /guidelines) render the new slate-950+emerald aesthetic with sticky header, [data-testid=legal-back-btn], 'LAST UPDATED · MARCH 2026' subtitle, emerald section titles and ▹ bullets. Cookies has the table; Guidelines has Welcome + Not Allowed sections; Terms has 11 numbered sections. Back button correctly navigates via history. Socket.IO polling endpoint returns HTTP 200 (transport change is code-safe). CRITICAL FRONTEND BUG: ProfileTab.js references `uploadingPic` on lines 163 & 195 but never declares it via useState — Profile tab crashes with ReferenceError the moment user clicks the Profile tab, completely blocking validation of upload-picture-btn / picture-file-input / remove-picture-btn UI flow. Backend endpoints work; the wiring layer is broken.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "ProfileTab", "issue": "ReferenceError: uploadingPic is not defined. The component reads `uploadingPic` on line 163 (button disabled prop) and line 195 (loading text) but never declares the state. Result: opening the Profile tab triggers a React runtime-error overlay and the whole tab is unusable — camera button, file input, avatar, remove button, AND every other profile control (name, bio, interests, telegram_id, stumble-id-display, save) is unreachable. This is a regression introduced by the picture-upload feature.", "selector": "[data-testid=\"upload-picture-btn\"], [data-testid=\"picture-file-input\"], [data-testid=\"remove-picture-btn\"]", "priority": "CRITICAL"},
+      {"component": "CookiePolicy", "issue": "React hydration warning: emergent preview dev-tooling injects a <span data-ve-dynamic=\"true\"> wrapper between <tbody> and <tr> when rendering cookieTable.map(...). Generates a console error 'In HTML, <span> cannot be a child of <tbody>'. Cosmetic/tooling — not a user-visible bug but pollutes console.", "selector": "table tbody", "priority": "LOW"}
+    ],
+    "integration_issues": [
+      {"flow": "Profile picture upload (camera button → file input → POST /api/profile/picture → avatar updates)", "issue": "Cannot be exercised in the UI at all because ProfileTab crashes on render (see uploadingPic ReferenceError). Backend API itself fully verified via pytest (data URL stored + returned in /profile/me, DELETE clears it).", "affected_selectors": ["[data-testid=\"upload-picture-btn\"]", "[data-testid=\"picture-file-input\"]", "[data-testid=\"remove-picture-btn\"]"]},
+      {"flow": "AppHeader Live badge (Socket.IO connect)", "issue": "Header shows 'CONNECTING' badge in captured screenshot. Polling endpoint /api/socket.io/?EIO=4&transport=polling returns 200, so transport order change in Home.js is safe at the protocol level. However, the connect event lifecycle could not be visually confirmed because the page rendered the runtime-error overlay shortly after auth. Recommend re-test after the ProfileTab crash is fixed.", "affected_selectors": ["AppHeader connection badge"]}
+    ],
+    "design_issues": [
+      {"screen": "Legal pages (/privacy, /terms, /cookies, /guidelines)", "issues": ["Design verified visually: slate-950 background, emerald section titles, ▹ markers on bullet rows, sticky header with back button, 'LAST UPDATED · MARCH 2026' subtitle. Guidelines shows green check / red X badges. Looks polished. No contrast issues observed."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_profile_picture.py",
+    "/app/test_reports/pytest/profile_picture_results.xml",
+    "/app/test_reports/pytest/stumble_v2_results.xml"
+  ],
+  "action_items": [
+    "CRITICAL: In /app/frontend/src/components/tabs/ProfileTab.js add `const [uploadingPic, setUploadingPic] = useState(false);` near the other useState calls (around line 56) and toggle it inside handlePictureChange (setUploadingPic(true) before fetch, setUploadingPic(false) in finally). Without this, the Profile tab is 100% broken.",
+    "After fix, re-test: navigate to Profile tab, verify upload-picture-btn and hidden picture-file-input render; upload a small PNG; assert avatar img src becomes data:image/png;base64,...; verify remove-picture-btn appears; click it (window.confirm), verify DELETE /api/profile/picture is called and avatar reverts to gradient placeholder. Backend already validated.",
+    "(Pre-existing) /app/backend/tests/test_stumble_features_v2.py::TestHotlist::test_pin_removes_ttl has stale `from db import conv_id_for` import (no such module). 16/17 pass — remove that test or replace with REST-only check.",
+    "(Low) CookiePolicy <tr> rendering inside <tbody> triggers a hydration warning because the emergent preview tooling injects a wrapper <span>. If the tooling is configurable, exclude cookieTable map. Otherwise, ignore — it's preview-only noise."
+  ],
+  "critical_code_review_comments": [
+    "Missing useState declaration is a basic React lifecycle bug — must be caught by ESLint rule `no-undef`. Recommend enabling eslint-plugin-react-hooks/exhaustive-deps and react/jsx-no-undef in CI to prevent recurrence.",
+    "ProfileTab.js mixes presentational + data-fetching + file upload concerns. Once stable, consider extracting useProfilePicture() hook (handlePictureChange / handleRemovePicture / uploadingPic) for testability.",
+    "Backend POST /api/profile/picture correctly enforces MIME whitelist, 2MB cap, empty-file rejection, and persists as a data: URL — good. But storing base64 in MongoDB (~33% overhead, 2.6MB doc limit risk if multiple fields use this pattern). For scale, switch to S3/GridFS and return a signed URL.",
+    "Two more Mongo projections in server.py still use `{'_id':0,'blocked':1,'hotlist':1}` pattern (lines 1196, 1262, 1269). Confirmed `is None` checks in send_message after iteration 5 fix; recheck delete_message, block toggle, hotlist toggle for the same defensive pattern."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_profile_picture.py (new — 13 cases: 5 upload, 2 delete, 6 regression smoke)"
+  ],
+  "success_rate": {"backend": "100% (13/13 picture + smoke; 16/17 prior regression — 1 pre-existing import bug)", "frontend": "~50% (4/4 legal pages OK, back-button OK, design OK; profile-picture UI 0% testable due to ProfileTab crash)"},
+  "test_credentials": "Email-OTP backdoor unchanged: POST /api/auth/email/send-otp returns dev_code; POST /api/auth/email/verify-otp returns session_token. Admin token: stumblechat_admin_2026.",
+  "seed_data_creation": "TEST_pic_* users created via OTP for upload tests (valid_png, wrong_type, empty_file, too_large, delete_pic, smoke_*). Single TEST_pic_ui2 user used in UI walkthrough.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend picture endpoints are 100% green — no need to re-test unless server.py changes. The single open blocker is ProfileTab.js missing `uploadingPic` state declaration. After main agent adds `const [uploadingPic, setUploadingPic] = useState(false);` and updates handlePictureChange, retest just the UI: log in via email OTP (use localStorage keys: 'user' = JSON of {user_id, session_token, ...}, 'authMethod'='email', 'authSession'={token,userId}; sessionStorage 'session_token'=token), accept 18+ modal (age-agree-checkbox + age-confirm-btn), click tab-profile, then verify upload-picture-btn + picture-file-input render, set_input_files with a small PNG, expect avatar img with data:image/* src, and remove-picture-btn appears. WSS polling 200 is confirmed; visually re-confirm 'Live' badge after the crash is gone. Legal pages do NOT need re-testing.",
+  "rca of the issue": "RCA — Profile tab unusable after picture-upload feature added: The diff that introduced camera button + file input also referenced a loading flag `uploadingPic` on lines 163 (`disabled={uploadingPic}`) and 195 (`{uploadingPic && <span>Uploading…</span>}`) but the corresponding `const [uploadingPic, setUploadingPic] = useState(false)` declaration was never added alongside the other useState calls (lines 47-56). React throws ReferenceError on first render, the dev-overlay covers the screen, and every other profile control (name, bio, interests, gender, telegram_id, stumble_id, save button) becomes unreachable. Mitigation: declare the state at line 56 and gate the picture-input click + fetch in handlePictureChange with setUploadingPic(true/false). Estimated patch: 3 lines. After patch, the previously passing backend API will be exercisable end-to-end from the UI."
+}

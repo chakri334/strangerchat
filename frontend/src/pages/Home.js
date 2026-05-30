@@ -127,7 +127,10 @@ const Home = () => {
 
     const newSocket = io(BACKEND_URL, {
       path: '/api/socket.io',
-      transports: ['websocket', 'polling'],
+      // Polling first guarantees `connect` fires even when WSS is blocked by ingress
+      // (e.g. some preview environments). Production ingress upgrades to wss automatically.
+      transports: ['polling', 'websocket'],
+      upgrade: true,
       reconnection: true, reconnectionAttempts: Infinity,
       reconnectionDelay: 1000, reconnectionDelayMax: 10000, randomizationFactor: 0.5,
       timeout: 20000, forceNew: false, multiplex: true,
