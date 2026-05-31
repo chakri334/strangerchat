@@ -12,6 +12,16 @@ from helpers import resolve_session, public_user_brief
 router = APIRouter()
 
 
+def next_monday_utc() -> datetime:
+    """Return the next Monday 00:00 UTC. All chats are wiped at this boundary."""
+    now = datetime.now(timezone.utc)
+    days_ahead = (7 - now.weekday()) % 7  # Monday = 0
+    if days_ahead == 0:
+        days_ahead = 7  # today is Monday → schedule next Monday
+    target = (now + timedelta(days=days_ahead)).replace(hour=0, minute=0, second=0, microsecond=0)
+    return target
+
+
 @router.get("/api/conversations")
 async def list_conversations(request: Request):
     session = await resolve_session(request)
@@ -119,7 +129,6 @@ async def send_message(peer_user_id: str, request: Request):
 
     conv = conv_id_for(me, peer_user_id)
     now = datetime.now(timezone.utc)
-    pinned = (peer_user_id in ((my_doc or {}).get("hotlist") or [])) or (me in (peer_doc.get("hotlist") or []))
 
     msg = {
         "message_id": f"msg_{secrets.token_hex(8)}",
@@ -133,10 +142,8 @@ async def send_message(peer_user_id: str, request: Request):
         "read_by": [me],
         "deleted_for": [],
         "deleted_for_everyone": False,
-        "pinned": pinned,
+        "expires_at": next_monday_utc(),  # All chats wipe every Monday 00:00 UTC
     }
-    if not pinned:
-        msg["expires_at"] = now + timedelta(days=7)
     await messages_collection.insert_one(msg)
 
     peer_sids = [sid for sid, u in active_connections.items() if u.get("user_id") == peer_user_id]
@@ -147,7 +154,7 @@ async def send_message(peer_user_id: str, request: Request):
     for psid in peer_sids:
         await sio.emit("direct_message", payload, room=psid)
 
-    return {"ok": True, "message": {**payload, "pinned": pinned}}
+    return {"ok": True, "message": payload}
 
 
 @router.delete("/api/conversations/{peer_user_id}/messages/{message_id}")

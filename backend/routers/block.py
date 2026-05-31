@@ -1,11 +1,9 @@
 """Block + Hotlist routes."""
 from fastapi import APIRouter, Request, Response
 
-from db import users_collection, messages_collection, conv_id_for
+from db import users_collection
 from state import active_connections
 from helpers import resolve_session
-
-from datetime import datetime, timezone, timedelta
 
 router = APIRouter()
 
@@ -52,7 +50,7 @@ async def list_blocked(request: Request):
     return {"ok": True, "users": users}
 
 
-# ─── Hotlist (pinned conversations) ────────────────────────────────────────
+# ─── Hotlist (saved contacts — does NOT affect chat retention) ─────────────
 @router.get("/api/hotlist")
 async def list_hotlist(request: Request):
     session = await resolve_session(request)
@@ -81,11 +79,6 @@ async def hotlist_add(target_user_id: str, request: Request):
     await users_collection.update_one(
         {"user_id": session["user_id"]}, {"$addToSet": {"hotlist": target_user_id}},
     )
-    conv = conv_id_for(session["user_id"], target_user_id)
-    await messages_collection.update_many(
-        {"conv_id": conv},
-        {"$unset": {"expires_at": ""}, "$set": {"pinned": True}},
-    )
     return {"ok": True, "pinned": target_user_id}
 
 
@@ -97,13 +90,4 @@ async def hotlist_remove(target_user_id: str, request: Request):
     await users_collection.update_one(
         {"user_id": session["user_id"]}, {"$pull": {"hotlist": target_user_id}},
     )
-    other = await users_collection.find_one({"user_id": target_user_id}, {"_id": 0, "hotlist": 1})
-    other_pins = set((other or {}).get("hotlist") or [])
-    if session["user_id"] not in other_pins:
-        expires_at = datetime.now(timezone.utc) + timedelta(days=7)
-        conv = conv_id_for(session["user_id"], target_user_id)
-        await messages_collection.update_many(
-            {"conv_id": conv},
-            {"$set": {"expires_at": expires_at, "pinned": False}},
-        )
     return {"ok": True, "unpinned": target_user_id}

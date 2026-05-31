@@ -212,11 +212,28 @@ async def get_active_users(request: Request,
     if gender_filter in ("male", "female", "both", "other"):
         me_interested_in = gender_filter
 
+    # Restrict directory to users signed in with Google (exclude Telegram + guests + email-OTP).
+    candidate_uids = {
+        u.get("user_id") for u in active_connections.values()
+        if u.get("user_id") and not u.get("is_telegram")
+    }
+    google_uids = set()
+    if candidate_uids:
+        cursor = users_collection.find(
+            {"user_id": {"$in": list(candidate_uids)}, "provider": "google"},
+            {"_id": 0, "user_id": 1},
+        )
+        async for doc in cursor:
+            google_uids.add(doc["user_id"])
+
     users = []
     for sid, user in active_connections.items():
         if me and user.get("user_id") == me.get("user_id"):
             continue
         if user.get("user_id") and user["user_id"] in me_blocked:
+            continue
+        # Guests, Telegram users, and non-Google accounts are hidden from People tab.
+        if not user.get("user_id") or user.get("is_telegram") or user["user_id"] not in google_uids:
             continue
 
         user_city = user.get("city", "Global")

@@ -43,6 +43,6 @@ async def init_indexes():
     await messages_collection.create_index('conv_id')
     await messages_collection.create_index([('conv_id', 1), ('created_at', -1)])
     await messages_collection.create_index('message_id', unique=True)
-    # Auto-purge after 7 days unless `pinned: true` (hotlist conversations stay).
-    # Mongo TTL works on a date field; we use `expires_at` and remove it for pinned msgs.
+    # All chats expire next Monday 00:00 UTC (set on each insert; see routers/conversations.next_monday_utc).
+    # Legacy pinned messages without `expires_at` are backfilled on app startup.
     await messages_collection.create_index('expires_at', expireAfterSeconds=0)

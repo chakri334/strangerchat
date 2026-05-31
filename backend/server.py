@@ -29,7 +29,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from pathlib import Path
 
-from db import users_collection, reports_collection, sessions_collection, init_indexes
+from db import users_collection, reports_collection, sessions_collection, messages_collection, init_indexes
 from state import (
     sio, ALLOWED_ORIGINS,
     active_connections, waiting_queue, city_users, active_chats, user_rooms,
@@ -37,6 +37,7 @@ from state import (
     user_sessions, users_db,
 )
 from helpers import generate_unique_stumble_id
+from routers.conversations import next_monday_utc
 
 # Routers
 from routers.auth import router as auth_router
@@ -77,6 +78,18 @@ async def lifespan(app_instance):
         logger.info("User backfill complete (stumble_id, hotlist, blocked, telegram_id)")
     except Exception as e:
         logger.error(f"User backfill failed: {e}")
+
+    # Backfill — every message gets `expires_at = next Monday`. This sweeps up
+    # legacy pinned-hotlist messages so they obey the new weekly Monday purge.
+    try:
+        backfill_result = await messages_collection.update_many(
+            {"expires_at": {"$exists": False}},
+            {"$set": {"expires_at": next_monday_utc()}, "$unset": {"pinned": ""}},
+        )
+        if backfill_result.modified_count:
+            logger.info(f"Message TTL backfill: {backfill_result.modified_count} legacy messages set to expire next Monday")
+    except Exception as e:
+        logger.error(f"Message TTL backfill failed: {e}")
 
     # Telegram bot (optional)
     bot_task = None

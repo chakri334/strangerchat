@@ -5,6 +5,15 @@ Build a full-stack anonymous stranger chat web app named "Stumble Chat" with rea
 
 ## Recent Changes (Feb 2026)
 
+- **People tab → Google-only directory + weekly Monday chat purge (Feb 22 2026):**
+  - `GET /api/active-users` now filters to **users signed in with Google only** — guests, Telegram bot users, and email-OTP/dev users are hidden. Random Chat behaviour is unchanged (still matches across guests/Telegram).
+  - **Hotlist semantics reduced to a pure contacts bookmark.** `POST /api/hotlist/{user_id}` and `DELETE /api/hotlist/{user_id}` no longer touch the `messages` collection; the `pinned` field on messages is no longer set or read by `send_message`.
+  - **All persistent chats now wipe every Monday 00:00 UTC.** New messages stamp `expires_at = next_monday_utc()`; the existing TTL index handles purge. Legacy pinned-hotlist messages without `expires_at` are backfilled on startup so they obey the new rule.
+  - New helper: `routers/conversations.next_monday_utc()`.
+  - New backend tests: `tests/test_monday_purge_and_google_filter.py` (4 cases — all pass).
+
+
+
 - **Backend router-split refactor validated (Feb 22 2026):**
   - 59/59 backend tests pass across the new 5-router layout (`auth.py`, `profile.py`, `block.py`, `conversations.py`, `admin.py`).
   - `state.py` shared dicts confirmed as the single source of truth (Socket.IO ⇄ REST share identical objects).
