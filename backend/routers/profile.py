@@ -1,5 +1,6 @@
 """Profile routes — /api/profile/me, picture upload, gallery, /api/users/search, /api/active-users."""
 import base64 as _b64
+import secrets
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -13,6 +14,8 @@ from state import (
 from helpers import resolve_session, haversine_km
 
 router = APIRouter()
+
+NEARBY_KM = 100  # within this radius → sort by distance; beyond → randomised
 
 
 # ─── Profile CRUD ──────────────────────────────────────────────────────────
@@ -263,6 +266,14 @@ async def get_active_users(request: Request,
         users.append(entry)
 
     if lat is not None and lng is not None:
-        users.sort(key=lambda u: u.get("distance_km", float("inf")))
+        # Split: within 100 km → sort by distance ascending; beyond → randomised
+        nearby = [u for u in users if u.get("distance_km") is not None and u["distance_km"] <= NEARBY_KM]
+        far = [u for u in users if u.get("distance_km") is None or u["distance_km"] > NEARBY_KM]
+        nearby.sort(key=lambda u: u["distance_km"])
+        # Cryptographically random shuffle for the "far" bucket
+        for i in range(len(far) - 1, 0, -1):
+            j = secrets.randbelow(i + 1)
+            far[i], far[j] = far[j], far[i]
+        users = nearby + far
 
     return {"users": users, "count": len(users)}

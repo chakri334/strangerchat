@@ -192,7 +192,24 @@ const Home = () => {
       trackGeoMatch(userCityRef.current, data.partner?.city);
       toast.success('Connected to someone!');
     });
-    newSocket.on('partner_disconnected', () => { toast.info('Chat partner disconnected'); setChatActive(false); setPartner(null); });
+    newSocket.on('partner_disconnected', () => {
+      // Partner left — keep this user IN the flow: queue them for a new stranger
+      // automatically. The user only goes home when THEY hit Disconnect.
+      toast.info('Partner left. Finding a new stranger…');
+      setChatActive(false);
+      setPartner(null);
+      setIsSearchingSync(true);
+      newSocket.emit('join_queue', { city: userCityRef.current });
+      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+      const thisSearch = ++searchCountRef.current;
+      searchTimerRef.current = setTimeout(function retry() {
+        if (searchCountRef.current !== thisSearch) return;
+        if (isSearchingRef.current) {
+          socketRef.current?.emit('join_queue', { city: userCityRef.current });
+          searchTimerRef.current = setTimeout(retry, RETRY_INTERVAL_MS);
+        }
+      }, RETRY_INTERVAL_MS);
+    });
     newSocket.on('chat_ended', () => { setChatActive(false); setPartner(null); });
 
     // New: refresh chats tab when new direct message arrives

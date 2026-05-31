@@ -5,6 +5,14 @@ Build a full-stack anonymous stranger chat web app named "Stumble Chat" with rea
 
 ## Recent Changes (Feb 2026)
 
+- **Random-chat survives partner exits + mobile-toast fix + nearby-only distance sort (Feb 22 2026):**
+  - `Home.js`: on `partner_disconnected` the user now **auto re-queues** for a new stranger (showing *"Partner left. Finding a new stranger…"*) instead of bouncing back to the home screen. The user only goes home when THEY click Disconnect. Skip behaviour was already correct (frontend triggers `join_queue` on `handleSkipToNew`).
+  - `App.js`: `<Toaster>` moved from `position="top-center"` to `bottom-center` with `closeButton` and `offset={80}` / `mobileOffset={88}` — toasts no longer cover the partner's name in the chat header on mobile, and every toast now has a visible X to dismiss.
+  - `routers/profile.py`: `/api/active-users` now splits results — peers within **100 km** are sorted ascending by `distance_km`; peers **beyond 100 km (or with unknown location)** are randomly shuffled using `secrets.randbelow` (Fisher-Yates). New constant `NEARBY_KM = 100`.
+  - New tests in `tests/test_people_sort_100km.py` — both pass.
+
+
+
 - **People tab → Google-only directory + weekly Monday chat purge (Feb 22 2026):**
   - `GET /api/active-users` now filters to **users signed in with Google only** — guests, Telegram bot users, and email-OTP/dev users are hidden. Random Chat behaviour is unchanged (still matches across guests/Telegram).
   - **Hotlist semantics reduced to a pure contacts bookmark.** `POST /api/hotlist/{user_id}` and `DELETE /api/hotlist/{user_id}` no longer touch the `messages` collection; the `pinned` field on messages is no longer set or read by `send_message`.

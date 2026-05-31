@@ -29,7 +29,7 @@ function App() {
           </Suspense>
         </AuthProvider>
       </BrowserRouter>
-      <Toaster position="top-center" />
+      <Toaster position="bottom-center" closeButton offset={80} mobileOffset={88} />
     </div>
   );
 }
