@@ -170,11 +170,19 @@ const Home = () => {
       newSocket.emit('register_user', buildRegisterPayload(savedCity));
     });
     newSocket.on('disconnect', (reason) => {
-      setIsConnected(false);
+      // Server-initiated kick: do NOT auto-reconnect (avoids fighting login flow).
+      // Otherwise let Socket.IO's internal reconnection (configured above) handle it —
+      // calling .connect() here racing against the library caused isConnected to flicker.
+      if (reason === 'io server disconnect') {
+        setIsConnected(false);
+      }
       Analytics.userDisconnected();
-      if (reason !== 'io client disconnect') setTimeout(() => newSocket.connect(), 1000);
     });
-    newSocket.on('connect_error', () => setIsConnected(false));
+    newSocket.on('connect_error', () => {
+      // Don't set isConnected=false here — Socket.IO emits connect_error during every
+      // transport probe failure (polling→ws upgrade). Flipping state on each probe is
+      // what made the Connect button flash "Loading…" repeatedly.
+    });
     newSocket.on('reconnect', () => {
       newSocket.emit('register_user', buildRegisterPayload(savedCity));
       if (isSearchingRef.current) newSocket.emit('join_queue', { city: savedCity });

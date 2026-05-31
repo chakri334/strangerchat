@@ -60,23 +60,25 @@ const askLocation = () => new Promise((resolve) => {
 const PeopleTab = ({ onOpenChat }) => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [coords, setCoords] = useState(null);
   const [locationPrompted, setLocationPrompted] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResult, setSearchResult] = useState(null);
 
-  const fetchUsers = useCallback(async () => {
-    setLoading(true);
+  // `silent` skips the loading flicker for background polls and only spins the refresh icon.
+  const fetchUsers = useCallback(async ({ silent } = { silent: false }) => {
+    if (silent) setRefreshing(true); else setLoading(true);
     let path = '/api/active-users?city=Global';
     if (coords) path += `&lat=${coords.lat}&lng=${coords.lng}`;
     const { data } = await apiJSON(path);
     setUsers(data?.users || []);
-    setLoading(false);
+    if (silent) setRefreshing(false); else setLoading(false);
   }, [coords]);
 
   useEffect(() => {
-    fetchUsers();
-    const t = setInterval(fetchUsers, 8000);
+    fetchUsers({ silent: false });
+    const t = setInterval(() => fetchUsers({ silent: true }), 8000);
     return () => clearInterval(t);
   }, [fetchUsers]);
 
@@ -186,11 +188,11 @@ const PeopleTab = ({ onOpenChat }) => {
             </button>
           )}
           <button
-            onClick={fetchUsers}
+            onClick={() => fetchUsers({ silent: false })}
             className="flex items-center gap-1 rounded-lg bg-slate-800/60 border border-slate-700 text-slate-300 hover:text-white px-2.5 py-1.5 text-[11px] font-semibold"
             data-testid="refresh-people"
           >
-            <RefreshCw size={11} className={loading ? 'animate-spin' : ''} />
+            <RefreshCw size={11} className={(loading || refreshing) ? 'animate-spin' : ''} />
           </button>
         </div>
       </div>
