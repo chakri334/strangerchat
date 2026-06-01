@@ -15,6 +15,8 @@ const Guidelines = lazy(() => import('./pages/Guidelines'));
 function App() {
   return (
     <div className="App">
+      <h2 style={{position:'absolute',width:'1px',height:'1px',overflow:'hidden',clip:'rect(0,0,0,0)',whiteSpace:'nowrap'}}>Chat with Strangers Instantly – No Sign Up Required</h2>
+      <h2 style={{position:'absolute',width:'1px',height:'1px',overflow:'hidden',clip:'rect(0,0,0,0)',whiteSpace:'nowrap'}}>Meet New People from India and Around the World</h2>
       <BrowserRouter>
         <AuthProvider>
           <Suspense fallback={null}>
