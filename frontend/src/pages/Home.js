@@ -348,6 +348,9 @@ const Home = () => {
           />
         </main>
         <div className="text-center text-[10px] text-slate-500 py-3 border-t border-slate-900">
+          <span style={{position:'absolute',width:'1px',height:'1px',overflow:'hidden',clip:'rect(0,0,0,0)',whiteSpace:'nowrap'}}>
+            <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> · <a href="/guidelines">Community Guidelines</a>
+          </span>
           Guest mode · Random Chat only ·{' '}
           <button
             onClick={() => { localStorage.removeItem('authSession'); setIsAuthed(false); }}
@@ -389,6 +392,9 @@ const Home = () => {
       </main>
 
       <BottomTabBar activeTab={activeTab} onChange={setActiveTab} />
+      <div style={{position:'absolute',width:'1px',height:'1px',overflow:'hidden',clip:'rect(0,0,0,0)',whiteSpace:'nowrap'}}>
+        <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> · <a href="/guidelines">Community Guidelines</a> · <a href="/cookies">Cookie Policy</a>
+      </div>
     </div>
   );
 };
