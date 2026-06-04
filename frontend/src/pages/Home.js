@@ -393,6 +393,23 @@ const Home = () => {
       />
 
       <main className="flex flex-1 flex-col overflow-hidden pb-16">
+  {/* 
+    SEO STATIC CONTENT BLOCK
+    - Visually hidden from users but readable by search engine crawlers
+    - Google cannot read JavaScript-rendered content reliably
+    - This block provides keyword-rich static HTML for indexing
+    - Do NOT remove — this is critical for search visibility
+  */}
+  <div style={{position:'absolute',width:'1px',height:'1px',overflow:'hidden',clip:'rect(0,0,0,0)',whiteSpace:'nowrap'}}>
+    <h2>Free Random Chat App – Meet Strangers Online</h2>
+    <p>Stumble Chat is a free random chat app to meet strangers from India and worldwide. No sign up required. Connect instantly and start chatting.</p>
+    <h2>How It Works</h2>
+    <p>Click connect, get matched with a random stranger, and start chatting instantly. Share photos, have real conversations, and meet new people every day.</p>
+    <h2>Why Stumble Chat?</h2>
+    <p>100% free. No registration needed. Anonymous random chat. Meet people from Mumbai, Delhi, Chennai, Bangalore and cities across India.</p>
+    <h2>Chat with Strangers Safely</h2>
+    <p>Stumble Chat has community guidelines, reporting tools, and IP blocking to keep conversations safe and enjoyable for everyone.</p>
+  </div>
         {activeTab === 'people' && <PeopleTab onOpenChat={openDirectChat} />}
         {activeTab === 'random' && (
           <RandomChatTab isConnected={isConnected} isSearching={isSearching} onConnect={handleConnect} stats={stats} />
