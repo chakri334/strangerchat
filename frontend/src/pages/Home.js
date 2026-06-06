@@ -299,6 +299,15 @@ const Home = () => {
     setActivePeer(peer);
   }, []);
 
+  const handleAbsoluteLogout = useCallback(() => {
+    localStorage.clear();
+    sessionStorage.clear();
+    try {
+      logout();
+    } catch (e) {}
+    window.location.href = '/';
+  }, [logout]);
+
   // ── Routing guards ─────────────────────────────────────────────────────
   if (showLanding) {
     return (
@@ -348,12 +357,7 @@ const Home = () => {
           profile={profileForHeader}
           isConnected={isConnected}
           isAuthenticated={isAuthenticated}
-          onLogout={() => {
-            localStorage.clear();
-            sessionStorage.clear();
-            try { logout(); } catch (e) {}
-            window.location.href = '/';
-          }}
+          onLogout={handleAbsoluteLogout}
         />
         <main className="flex flex-1 flex-col">
           <div style={{position:'absolute',width:'1px',height:'1px',overflow:'hidden',clip:'rect(0,0,0,0)',whiteSpace:'nowrap'}}>
@@ -384,7 +388,7 @@ const Home = () => {
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-950 text-slate-100" data-testid="home-page">
-      <AppHeader profile={profileForHeader} isConnected={isConnected} isAuthenticated={isAuthenticated} onLogout={logout} />
+      <AppHeader profile={profileForHeader} isConnected={isConnected} isAuthenticated={isAuthenticated} onLogout={handleAbsoluteLogout} />
       <main className="flex flex-1 flex-col overflow-hidden pb-16">
         <div style={{position:'absolute',width:'1px',height:'1px',overflow:'hidden',clip:'rect(0,0,0,0)',whiteSpace:'nowrap'}}>
           <h2>Free Random Chat App – Meet Strangers Online</h2>
