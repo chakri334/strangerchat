@@ -344,11 +344,24 @@ const Home = () => {
     return (
       <div className="flex min-h-screen flex-col bg-slate-950 text-slate-100" data-testid="guest-home">
         <AppHeader
-          profile={profileForHeader}
-          isConnected={isConnected}
-          isAuthenticated={false}
-          onLogout={logout}
-        />
+  profile={profileForHeader}
+  isConnected={isConnected}
+  isAuthenticated={isAuthenticated}
+  onLogout={() => {
+    // 1. Clear out the cached username, gender, and session data
+    localStorage.removeItem('userName');
+    localStorage.removeItem('userGender');
+    localStorage.removeItem('userInterests');
+    localStorage.removeItem('authSession');
+    
+    // 2. Force the application state back to the landing page gateway
+    setShowLanding(true);
+    setIsAuthed(false);
+    
+    // 3. Call your existing AuthContext logout handler to clear cookies/tokens
+    logout();
+  }}
+/>
         <main className="flex flex-1 flex-col">
           <div style={{position:'absolute',width:'1px',height:'1px',overflow:'hidden',clip:'rect(0,0,0,0)',whiteSpace:'nowrap'}}>
             <h2>Free Random Chat App – Meet Strangers Online</h2>
