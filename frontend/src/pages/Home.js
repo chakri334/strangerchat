@@ -295,10 +295,10 @@ const Home = () => {
 
   // ── Routing guards ─────────────────────────────────────────────────────
   // ── Routing guards ─────────────────────────────────────────────────────
+  // ── Routing guards ─────────────────────────────────────────────────────
   if (showLanding) {
     return (
       <LandingPage 
-        // Changed to onGetStarted so it aligns perfectly with your component's internal listener
         onGetStarted={() => {
           setShowLanding(false);
           if (!isAuthed) {
@@ -314,10 +314,6 @@ const Home = () => {
             handleConnect();
           }, 100);
         }} 
-        liveUsersCount={stats?.online > 0 ? stats.online.toLocaleString() : "1,200+"} 
-      />
-    );
-  }
         liveUsersCount={stats?.online > 0 ? stats.online.toLocaleString() : "1,200+"} 
       />
     );
