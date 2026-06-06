@@ -294,28 +294,30 @@ const Home = () => {
   }, []);
 
   // ── Routing guards ─────────────────────────────────────────────────────
+  // ── Routing guards ─────────────────────────────────────────────────────
   if (showLanding) {
     return (
       <LandingPage 
-        onStartGuestChat={() => {
+        // Changed to onGetStarted so it aligns perfectly with your component's internal listener
+        onGetStarted={() => {
           setShowLanding(false);
           if (!isAuthed) {
             try {
+              // Sets up a clean guest session state in local storage
               localStorage.setItem('authSession', JSON.stringify({ mode: 'guest' }));
               setIsAuthed(true);
             } catch (e) {}
           }
+          
+          // Small operational delay to give React time to mount the RandomChat layout
           setTimeout(() => {
             handleConnect();
           }, 100);
         }} 
-        onSignInClick={() => {
-          setShowLanding(false);
-          if (guest) {
-            localStorage.removeItem('authSession');
-            window.location.reload();
-          }
-        }}
+        liveUsersCount={stats?.online > 0 ? stats.online.toLocaleString() : "1,200+"} 
+      />
+    );
+  }
         liveUsersCount={stats?.online > 0 ? stats.online.toLocaleString() : "1,200+"} 
       />
     );
