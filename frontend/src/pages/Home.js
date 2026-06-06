@@ -348,18 +348,17 @@ const Home = () => {
   isConnected={isConnected}
   isAuthenticated={isAuthenticated}
   onLogout={() => {
-    // 1. Clear out the cached username, gender, and session data
-    localStorage.removeItem('userName');
-    localStorage.removeItem('userGender');
-    localStorage.removeItem('userInterests');
-    localStorage.removeItem('authSession');
+// 1. Clear out all cached text values
+    localStorage.clear();
+    sessionStorage.clear();
     
-    // 2. Force the application state back to the landing page gateway
-    setShowLanding(true);
-    setIsAuthed(false);
-    
-    // 3. Call your existing AuthContext logout handler to clear cookies/tokens
-    logout();
+    // 2. Safely call context logout to clear backend tokens
+    try {
+      logout();
+    } catch (e) {}
+
+    // 3. Force a complete page refresh to clean out remaining React context memory
+    window.location.href = '/';
   }}
 />
         <main className="flex flex-1 flex-col">
