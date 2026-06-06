@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import ChatPage from '../components/ChatPage';
 import PersistentChatPage from '../components/PersistentChatPage';
 import WaitingPage from '../components/WaitingPage';
-import LandingPage from '../components/LandingPage'; 
+import LandingPage from '../components/LandingPage';
 import { Analytics } from '../utils/analytics';
 import { setGeoTitle, trackCitySearch, trackGeoMatch } from '../utils/seo';
 import OnboardingModal from '../components/OnboardingModal';
@@ -57,9 +57,9 @@ const Home = () => {
   );
   const [isAuthed, setIsAuthed] = useState(() => !!localStorage.getItem('authSession'));
   const [activeTab, setActiveTab] = useState('random');
-  const [activePeer, setActivePeer] = useState(null); 
+  const [activePeer, setActivePeer] = useState(null);
   const [chatRefreshKey, setChatRefreshKey] = useState(0);
-  const [showLanding, setShowLanding] = useState(true); 
+  const [showLanding, setShowLanding] = useState(true);
 
   const guest = isGuestMode();
   const myUserId = user?.user_id;
@@ -166,19 +166,24 @@ const Home = () => {
       Analytics.userConnected();
       newSocket.emit('register_user', buildRegisterPayload(savedCity));
     });
+
     newSocket.on('disconnect', (reason) => {
       if (reason === 'io server disconnect') {
         setIsConnected(false);
       }
       Analytics.userDisconnected();
     });
+
     newSocket.on('connect_error', () => {});
+    
     newSocket.on('reconnect', () => {
       newSocket.emit('register_user', buildRegisterPayload(savedCity));
       if (isSearchingRef.current) newSocket.emit('join_queue', { city: savedCity });
     });
+    
     newSocket.on('blocked', (data) => { setIsBlocked(true); setBlockMessage(data.message); toast.error(data.message); });
     newSocket.on('stats_update', (data) => setStats(data));
+    
     newSocket.on('match_found', (data) => {
       isSearchingRef.current = false;
       setIsSearching(false);
@@ -190,6 +195,7 @@ const Home = () => {
       trackGeoMatch(userCityRef.current, data.partner?.city);
       toast.success('Connected to someone!');
     });
+    
     newSocket.on('partner_disconnected', () => {
       toast.info('Partner left. Finding a new stranger…');
       setChatActive(false);
@@ -206,8 +212,8 @@ const Home = () => {
         }
       }, RETRY_INTERVAL_MS);
     });
+    
     newSocket.on('chat_ended', () => { setChatActive(false); setPartner(null); });
-
     newSocket.on('direct_message', () => setChatRefreshKey((k) => k + 1));
     newSocket.on('message_deleted', () => setChatRefreshKey((k) => k + 1));
     newSocket.on('conversation_cleared', () => setChatRefreshKey((k) => k + 1));
@@ -294,8 +300,6 @@ const Home = () => {
   }, []);
 
   // ── Routing guards ─────────────────────────────────────────────────────
-  // ── Routing guards ─────────────────────────────────────────────────────
-  // ── Routing guards ─────────────────────────────────────────────────────
   if (showLanding) {
     return (
       <LandingPage 
@@ -303,13 +307,10 @@ const Home = () => {
           setShowLanding(false);
           if (!isAuthed) {
             try {
-              // Sets up a clean guest session state in local storage
               localStorage.setItem('authSession', JSON.stringify({ mode: 'guest' }));
               setIsAuthed(true);
             } catch (e) {}
           }
-          
-          // Small operational delay to give React time to mount the RandomChat layout
           setTimeout(() => {
             handleConnect();
           }, 100);
@@ -344,23 +345,16 @@ const Home = () => {
     return (
       <div className="flex min-h-screen flex-col bg-slate-950 text-slate-100" data-testid="guest-home">
         <AppHeader
-  profile={profileForHeader}
-  isConnected={isConnected}
-  isAuthenticated={isAuthenticated}
-  onLogout={() => {
-// 1. Clear out all cached text values
-    localStorage.clear();
-    sessionStorage.clear();
-    
-    // 2. Safely call context logout to clear backend tokens
-    try {
-      logout();
-    } catch (e) {}
-
-    // 3. Force a complete page refresh to clean out remaining React context memory
-    window.location.href = '/';
-  }}
-/>
+          profile={profileForHeader}
+          isConnected={isConnected}
+          isAuthenticated={isAuthenticated}
+          onLogout={() => {
+            localStorage.clear();
+            sessionStorage.clear();
+            try { logout(); } catch (e) {}
+            window.location.href = '/';
+          }}
+        />
         <main className="flex flex-1 flex-col">
           <div style={{position:'absolute',width:'1px',height:'1px',overflow:'hidden',clip:'rect(0,0,0,0)',whiteSpace:'nowrap'}}>
             <h2>Free Random Chat App – Meet Strangers Online</h2>
@@ -372,23 +366,14 @@ const Home = () => {
             <h2>Chat with Strangers Safely</h2>
             <p>Stumble Chat has community guidelines, reporting tools, and IP blocking to keep conversations safe and enjoyable for everyone.</p>
           </div>
-          <RandomChatTab
-            isConnected={isConnected}
-            isSearching={isSearching}
-            onConnect={handleConnect}
-            stats={stats}
-          />
+          <RandomChatTab isConnected={isConnected} isSearching={isSearching} onConnect={handleConnect} stats={stats} />
         </main>
         <div className="text-center text-[10px] text-slate-500 py-3 border-t border-slate-900">
           <span style={{position:'absolute',width:'1px',height:'1px',overflow:'hidden',clip:'rect(0,0,0,0)',whiteSpace:'nowrap'}}>
             <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> · <a href="/guidelines">Community Guidelines</a>
           </span>
           Guest mode · Random Chat only ·{' '}
-          <button
-            onClick={() => { localStorage.removeItem('authSession'); setIsAuthed(false); }}
-            className="text-emerald-400 underline"
-            data-testid="upgrade-to-google-btn"
-          >
+          <button onClick={() => { localStorage.removeItem('authSession'); setIsAuthed(false); }} className="text-emerald-400 underline" data-testid="upgrade-to-google-btn">
             Sign in with Google
           </button>
           {' '}to unlock People, Chats and Profile
@@ -399,13 +384,7 @@ const Home = () => {
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-950 text-slate-100" data-testid="home-page">
-      <AppHeader
-        profile={profileForHeader}
-        isConnected={isConnected}
-        isAuthenticated={isAuthenticated}
-        onLogout={logout}
-      />
-
+      <AppHeader profile={profileForHeader} isConnected={isConnected} isAuthenticated={isAuthenticated} onLogout={logout} />
       <main className="flex flex-1 flex-col overflow-hidden pb-16">
         <div style={{position:'absolute',width:'1px',height:'1px',overflow:'hidden',clip:'rect(0,0,0,0)',whiteSpace:'nowrap'}}>
           <h2>Free Random Chat App – Meet Strangers Online</h2>
@@ -422,16 +401,10 @@ const Home = () => {
           <RandomChatTab isConnected={isConnected} isSearching={isSearching} onConnect={handleConnect} stats={stats} />
         )}
         {activeTab === 'chats' && (
-          <ChatsTab
-            refreshKey={chatRefreshKey}
-            onOpenChat={openDirectChat}
-            onGoMatch={() => setActiveTab('random')}
-            onGoPeople={() => setActiveTab('people')}
-          />
+          <ChatsTab refreshKey={chatRefreshKey} onOpenChat={openDirectChat} onGoMatch={() => setActiveTab('random')} onGoPeople={() => setActiveTab('people')} />
         )}
         {activeTab === 'profile' && <ProfileTab onSaved={handleProfileSaved} onOpenChat={openDirectChat} />}
       </main>
-
       <BottomTabBar activeTab={activeTab} onChange={setActiveTab} />
       <div style={{position:'absolute',width:'1px',height:'1px',overflow:'hidden',clip:'rect(0,0,0,0)',whiteSpace:'nowrap'}}>
         <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> · <a href="/guidelines">Community Guidelines</a> · <a href="/cookies">Cookie Policy</a>
