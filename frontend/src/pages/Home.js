@@ -61,7 +61,8 @@ const Home = () => {
   const [chatRefreshKey, setChatRefreshKey] = useState(0);
   const [showLanding, setShowLanding] = useState(true);
 
-  const guest = isGuestMode();
+  // FIX: Tie the dynamic guest evaluation explicitly to the isAuthed state tree
+  const guest = isAuthed && isGuestMode();
   const myUserId = user?.user_id;
 
   const socketRef = useRef(null);
@@ -114,7 +115,6 @@ const Home = () => {
   }, []);
 
   useEffect(() => {
-    // FIX: If in guest mode, do not read previous user profile data from localStorage
     const randomGuestName = `User${Math.floor(Math.random() * 9999)}`;
     const savedName = guest ? randomGuestName : (localStorage.getItem('userName') || randomGuestName);
     const savedAge = guest ? '' : (localStorage.getItem('userAge') || '');
@@ -125,7 +125,6 @@ const Home = () => {
     setUserGender(savedGender);
     setUserCity(savedCity);
     
-    // Only persist back to localStorage if they are not a guest
     if (!guest && !localStorage.getItem('userName')) {
       localStorage.setItem('userName', savedName);
     }
@@ -142,7 +141,7 @@ const Home = () => {
 
     const buildRegisterPayload = (city) => ({
       name: savedName, age: savedAge, gender: savedGender, city,
-      interests: guest ? [] : readStoredInterests(), // Send empty interests for guests
+      interests: guest ? [] : readStoredInterests(),
       session_token: sessionStorage.getItem('session_token') || undefined,
     });
 
@@ -227,7 +226,7 @@ const Home = () => {
     setSocket(newSocket);
 
     return () => newSocket.close();
-  }, [guest]); // Added guest dependency to rerun connection if mode switches
+  }, [guest]);
 
   useEffect(() => {
     if (!socket || !socket.connected) return;
@@ -319,13 +318,11 @@ const Home = () => {
     return (
       <LandingPage 
         onGetStarted={() => {
+          try {
+            localStorage.setItem('authSession', JSON.stringify({ mode: 'guest' }));
+          } catch (e) {}
           setShowLanding(false);
-          if (!isAuthed) {
-            try {
-              localStorage.setItem('authSession', JSON.stringify({ mode: 'guest' }));
-              setIsAuthed(true);
-            } catch (e) {}
-          }
+          setIsAuthed(true);
           setTimeout(() => {
             handleConnect();
           }, 100);
@@ -337,6 +334,41 @@ const Home = () => {
 
   if (!isAuthed) return <AuthOnboarding onAuthenticated={() => setIsAuthed(true)} />;
   if (showOnboarding) return <OnboardingModal onAccept={() => setShowOnboarding(false)} />;
+  if (isBlocked) return <BlockedScreen message={blockMessage} />;
+  
+  const profileForHeader = { name: user?.name || userName, avatar: user?.picture ? null : '😊' };
+
+  // 1. GUEST INTERCEPT: Strict layout isolation
+  if (guest) {
+    return (
+      <div className="flex min-h-screen flex-col bg-slate-950 text-slate-100" data-testid="guest-home">
+        <AppHeader
+          profile={profileForHeader}
+          isConnected={isConnected}
+          isAuthenticated={isAuthenticated}
+          onLogout={handleAbsoluteLogout}
+        />
+        <main className="flex flex-1 flex-col">
+          {isSearching && !chatActive ? (
+            <WaitingPage onCancel={handleCancelSearch} />
+          ) : chatActive && partner && socket ? (
+            <ChatPage socket={socket} partner={partner} onClose={handleCloseChat} onSkip={handleSkipToNew} />
+          ) : (
+            <RandomChatTab isConnected={isConnected} isSearching={isSearching} onConnect={handleConnect} stats={stats} />
+          )}
+        </main>
+        <div className="text-center text-[10px] text-slate-500 py-3 border-t border-slate-900">
+          Guest mode · Random Chat only ·{' '}
+          <button onClick={() => { localStorage.removeItem('authSession'); setIsAuthed(false); }} className="text-emerald-400 underline" data-testid="upgrade-to-google-btn">
+            Sign in with Google
+          </button>
+          {' '}to unlock People, Chats and Profile
+        </div>
+      </div>
+    );
+  }
+
+  // 2. FULL ACCESS: Standard member view orchestration
   if (isSearching && !chatActive) return <WaitingPage onCancel={handleCancelSearch} />;
   if (chatActive && partner && socket) {
     return <ChatPage socket={socket} partner={partner} onClose={handleCloseChat} onSkip={handleSkipToNew} />;
@@ -352,60 +384,11 @@ const Home = () => {
       />
     );
   }
-  if (isBlocked) return <BlockedScreen message={blockMessage} />;
-
-  const profileForHeader = { name: user?.name || userName, avatar: user?.picture ? null : '😊' };
-
-  if (guest) {
-    return (
-      <div className="flex min-h-screen flex-col bg-slate-950 text-slate-100" data-testid="guest-home">
-        <AppHeader
-          profile={profileForHeader}
-          isConnected={isConnected}
-          isAuthenticated={isAuthenticated}
-          onLogout={handleAbsoluteLogout}
-        />
-        <main className="flex flex-1 flex-col">
-          <div style={{position:'absolute',width:'1px',height:'1px',overflow:'hidden',clip:'rect(0,0,0,0)',whiteSpace:'nowrap'}}>
-            <h2>Free Random Chat App – Meet Strangers Online</h2>
-            <p>Stumble Chat is a free random chat app to meet strangers from India and worldwide. No sign up required. Connect instantly and start chatting.</p>
-            <h2>How It Works</h2>
-            <p>Click connect, get matched with a random stranger, and start chatting instantly. Share photos, have real conversations, and meet new people every day.</p>
-            <h2>Why Stumble Chat?</h2>
-            <p>100% free. No registration needed. Anonymous random chat. Meet people from Mumbai, Delhi, Chennai, Bangalore and cities across India.</p>
-            <h2>Chat with Strangers Safely</h2>
-            <p>Stumble Chat has community guidelines, reporting tools, and IP blocking to keep conversations safe and enjoyable for everyone.</p>
-          </div>
-          <RandomChatTab isConnected={isConnected} isSearching={isSearching} onConnect={handleConnect} stats={stats} />
-        </main>
-        <div className="text-center text-[10px] text-slate-500 py-3 border-t border-slate-900">
-          <span style={{position:'absolute',width:'1px',height:'1px',overflow:'hidden',clip:'rect(0,0,0,0)',whiteSpace:'nowrap'}}>
-            <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> · <a href="/guidelines">Community Guidelines</a>
-          </span>
-          Guest mode · Random Chat only ·{' '}
-          <button onClick={() => { localStorage.removeItem('authSession'); setIsAuthed(false); }} className="text-emerald-400 underline" data-testid="upgrade-to-google-btn">
-            Sign in with Google
-          </button>
-          {' '}to unlock People, Chats and Profile
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-950 text-slate-100" data-testid="home-page">
       <AppHeader profile={profileForHeader} isConnected={isConnected} isAuthenticated={isAuthenticated} onLogout={handleAbsoluteLogout} />
       <main className="flex flex-1 flex-col overflow-hidden pb-16">
-        <div style={{position:'absolute',width:'1px',height:'1px',overflow:'hidden',clip:'rect(0,0,0,0)',whiteSpace:'nowrap'}}>
-          <h2>Free Random Chat App – Meet Strangers Online</h2>
-          <p>Stumble Chat is a free random chat app to meet strangers from India and worldwide. No sign up required. Connect instantly and start chatting.</p>
-          <h2>How It Works</h2>
-          <p>Click connect, get matched with a random stranger, and start chatting instantly. Share photos, have real conversations, and meet new people every day.</p>
-          <h2>Why Stumble Chat?</h2>
-          <p>100% free. No registration needed. Anonymous random chat. Meet people from Mumbai, Delhi, Chennai, Bangalore and cities across India.</p>
-          <h2>Chat with Strangers Safely</h2>
-          <p>Stumble Chat has community guidelines, reporting tools, and IP blocking to keep conversations safe and enjoyable for everyone.</p>
-        </div>
         {activeTab === 'people' && <PeopleTab onOpenChat={openDirectChat} />}
         {activeTab === 'random' && (
           <RandomChatTab isConnected={isConnected} isSearching={isSearching} onConnect={handleConnect} stats={stats} />
@@ -416,9 +399,6 @@ const Home = () => {
         {activeTab === 'profile' && <ProfileTab onSaved={handleProfileSaved} onOpenChat={openDirectChat} />}
       </main>
       <BottomTabBar activeTab={activeTab} onChange={setActiveTab} />
-      <div style={{position:'absolute',width:'1px',height:'1px',overflow:'hidden',clip:'rect(0,0,0,0)',whiteSpace:'nowrap'}}>
-        <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> · <a href="/guidelines">Community Guidelines</a> · <a href="/cookies">Cookie Policy</a>
-      </div>
     </div>
   );
 };
