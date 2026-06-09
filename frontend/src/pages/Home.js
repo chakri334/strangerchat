@@ -114,15 +114,21 @@ const Home = () => {
   }, []);
 
   useEffect(() => {
-    const savedName = localStorage.getItem('userName') || `User${Math.floor(Math.random() * 9999)}`;
-    const savedAge = localStorage.getItem('userAge') || '';
-    const savedGender = localStorage.getItem('userGender') || '';
+    // FIX: If in guest mode, do not read previous user profile data from localStorage
+    const randomGuestName = `User${Math.floor(Math.random() * 9999)}`;
+    const savedName = guest ? randomGuestName : (localStorage.getItem('userName') || randomGuestName);
+    const savedAge = guest ? '' : (localStorage.getItem('userAge') || '');
+    const savedGender = guest ? '' : (localStorage.getItem('userGender') || '');
     const savedCity = localStorage.getItem('userCity') || 'Global';
 
     setUserName(savedName);
     setUserGender(savedGender);
     setUserCity(savedCity);
-    if (!localStorage.getItem('userName')) localStorage.setItem('userName', savedName);
+    
+    // Only persist back to localStorage if they are not a guest
+    if (!guest && !localStorage.getItem('userName')) {
+      localStorage.setItem('userName', savedName);
+    }
 
     const newSocket = io(BACKEND_URL, {
       path: '/api/socket.io',
@@ -136,7 +142,7 @@ const Home = () => {
 
     const buildRegisterPayload = (city) => ({
       name: savedName, age: savedAge, gender: savedGender, city,
-      interests: readStoredInterests(),
+      interests: guest ? [] : readStoredInterests(), // Send empty interests for guests
       session_token: sessionStorage.getItem('session_token') || undefined,
     });
 
@@ -221,19 +227,19 @@ const Home = () => {
     setSocket(newSocket);
 
     return () => newSocket.close();
-  }, []);
+  }, [guest]); // Added guest dependency to rerun connection if mode switches
 
   useEffect(() => {
     if (!socket || !socket.connected) return;
     socket.emit('register_user', {
       name: userName || 'Anonymous',
-      age: localStorage.getItem('userAge') || '',
+      age: guest ? '' : (localStorage.getItem('userAge') || ''),
       gender: userGender,
       city: userCity,
-      interests: userInterests,
+      interests: guest ? [] : userInterests,
       session_token: sessionStorage.getItem('session_token') || undefined,
     });
-  }, [userInterests, userGender, userName, userCity, socket]);
+  }, [userInterests, userGender, userName, userCity, socket, guest]);
 
   const scheduleRetry = useCallback((thisSearch) => {
     searchTimerRef.current = setTimeout(() => {
