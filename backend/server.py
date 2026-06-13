@@ -270,7 +270,9 @@ async def handle_send_message(sid, data):
         await sio.emit("error", {"message": "Not in a chat room"}, room=sid)
         return
     room_id = user_rooms[sid]
-    message = data.get("message", "")
+    message = str(data.get("message", ""))[:2000]  # hard cap — prevents DoS/memory abuse
+    if not message.strip():
+        return
     timestamp = datetime.now(timezone.utc).isoformat()
     if room_id in active_chats:
         partner_sid = [s for s in active_chats[room_id] if s != sid]
