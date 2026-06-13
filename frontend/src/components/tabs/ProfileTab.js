@@ -1,326 +1,218 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { Save, X, Plus, Copy, AtSign, Send, Camera, Trash2 } from 'lucide-react';
+import { useEffect, useState, useCallback } from 'react';
+import { RefreshCw, MapPin, Search, MessageSquarePlus, X, AtSign } from 'lucide-react';
 import { toast } from 'sonner';
-import { apiJSON, apiFetch } from '../../utils/api';
-import HotlistSection from './HotlistSection';
-import ImageGallery from './ImageGallery';
+import { apiJSON } from '../../utils/api';
 
-const GENDER_OPTIONS = [
-  { value: '', label: 'Prefer not to say' },
-  { value: 'male', label: 'Male' },
-  { value: 'female', label: 'Female' },
-  { value: 'other', label: 'Other' },
-];
-
-const INTERESTED_IN_OPTIONS = [
-  { value: '', label: 'Anyone' },
-  { value: 'male', label: 'Men' },
-  { value: 'female', label: 'Women' },
-  { value: 'both', label: 'Both' },
-];
-
-const SUGGESTED_INTERESTS = ['music', 'gaming', 'movies', 'coding', 'art', 'travel', 'fitness', 'foodie', 'memes', 'books'];
-
-const Field = ({ label, hint, children }) => (
-  <div className="space-y-1.5">
-    <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">{label}</label>
-    {children}
-    {hint && <p className="text-[10px] text-slate-500">{hint}</p>}
-  </div>
+const InterestChip = ({ label }) => (
+  <span className="rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-[10px] uppercase tracking-wider px-2 py-0.5">
+    #{label}
+  </span>
 );
 
-const Pill = ({ active, disabled, children, onClick, testid }) => (
+const PersonCard = ({ user, onOpenChat }) => (
   <button
     type="button"
-    onClick={onClick}
-    disabled={disabled}
-    data-testid={testid}
-    className={`rounded-full px-3 py-1.5 text-xs font-semibold border transition-colors ${
-      active
-        ? 'bg-emerald-500/15 border-emerald-500/50 text-emerald-300'
-        : 'bg-slate-900 border-slate-800 text-slate-300 hover:text-white'
-    } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+    onClick={() => onOpenChat(user)}
+    className="w-full text-left rounded-2xl border border-slate-800 bg-slate-900/50 p-3 hover:border-emerald-500/40 hover:bg-slate-900 transition-all flex items-start gap-3"
+    data-testid={`person-card-${user.user_id}`}
   >
-    {children}
+    {user.picture ? (
+      <img src={user.picture} alt={user.name} className="h-12 w-12 rounded-2xl object-cover border border-slate-800 shrink-0" />
+    ) : (
+      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-tr from-[#7c5cfc] to-emerald-400 text-2xl select-none">
+        {user.emoji || '😊'}
+      </div>
+    )}
+    <div className="flex-1 min-w-0">
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="text-sm font-bold text-white truncate">{user.name}</h3>
+        {user.distance_km !== undefined && (
+          <span className="text-[10px] text-emerald-300 font-mono whitespace-nowrap">{user.distance_km} km</span>
+        )}
+      </div>
+      <div className="flex items-center gap-2 text-[10px] text-slate-500 mt-0.5">
+        {user.stumble_id && <span className="font-mono text-emerald-400">{user.stumble_id}</span>}
+        {user.city && user.city !== 'Global' && (
+          <span className="flex items-center gap-0.5"><MapPin size={9} />{user.city}</span>
+        )}
+        {user.gender && <span className="uppercase">{user.gender}</span>}
+      </div>
+      {user.bio && <p className="text-[11px] text-slate-300 mt-1 line-clamp-1">{user.bio}</p>}
+      {user.interests?.length > 0 && (
+        <div className="flex flex-wrap gap-1 mt-1.5">
+          {user.interests.slice(0, 3).map((tag) => <InterestChip key={tag} label={tag} />)}
+        </div>
+      )}
+    </div>
+    <MessageSquarePlus size={16} className="text-emerald-400 mt-1 shrink-0" />
   </button>
 );
 
-const ProfileTab = ({ onSaved, onOpenChat }) => {
-  const [profile, setProfile] = useState(null);
-  const [name, setName] = useState('');
-  const [bio, setBio] = useState('');
-  const [gender, setGender] = useState('');
-  const [interestedIn, setInterestedIn] = useState('');
-  const [interests, setInterests] = useState([]);
-  const [newInterest, setNewInterest] = useState('');
-  const [telegramId, setTelegramId] = useState('');
-  const [saving, setSaving] = useState(false);
+const askLocation = () => new Promise((resolve) => {
+  if (!('geolocation' in navigator)) { resolve(null); return; }
+  navigator.geolocation.getCurrentPosition(
+    (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+    () => resolve(null),
+    { enableHighAccuracy: false, timeout: 8000, maximumAge: 60_000 },
+  );
+});
+
+const PeopleTab = ({ onOpenChat }) => {
+  const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [uploadingPic, setUploadingPic] = useState(false);
-  const [images, setImages] = useState([]);
-  const [hotlistRefresh, setHotlistRefresh] = useState(0);
-  const fileInputRef = useRef(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [coords, setCoords] = useState(null);
+  const [locationPrompted, setLocationPrompted] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [searchResult, setSearchResult] = useState(null);
 
-  const load = useCallback(async () => {
-    const { ok, data } = await apiJSON('/api/profile/me');
-    if (!ok || !data?.ok || !data.profile) { setLoading(false); return; }
-    const p = data.profile;
-    setProfile(p);
-    setName(p.name || '');
-    setBio(p.bio || '');
-    setGender(p.gender || '');
-    setInterestedIn(p.interested_in || '');
-    setInterests(p.interests || []);
-    setTelegramId(p.telegram_id || '');
-    setImages(p.images || []);
-    setLoading(false);
-  }, []);
+  // `silent` skips the loading flicker for background polls and only spins the refresh icon.
+  const fetchUsers = useCallback(async ({ silent } = { silent: false }) => {
+    if (silent) setRefreshing(true); else setLoading(true);
+    let path = '/api/active-users?city=Global';
+    if (coords) path += `&lat=${coords.lat}&lng=${coords.lng}`;
+    const { data } = await apiJSON(path);
+    setUsers(data?.users || []);
+    if (silent) setRefreshing(false); else setLoading(false);
+  }, [coords]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    fetchUsers({ silent: false });
+    const t = setInterval(() => fetchUsers({ silent: true }), 8000);
+    return () => clearInterval(t);
+  }, [fetchUsers]);
 
-  const addInterest = (tag) => {
-    const clean = (tag || '').trim().toLowerCase();
-    if (!clean) return;
-    if (interests.includes(clean)) return;
-    if (interests.length >= 10) { toast.error('Maximum 10 interests'); return; }
-    setInterests([...interests, clean]);
-    setNewInterest('');
-  };
-  const removeInterest = (tag) => setInterests(interests.filter((t) => t !== tag));
-
-  const handleSave = async () => {
-    setSaving(true);
-    const { ok, data } = await apiJSON('/api/profile/me', {
-      method: 'PUT',
-      body: JSON.stringify({ name, bio, gender, interested_in: interestedIn, interests, telegram_id: telegramId }),
-    });
-    setSaving(false);
-    if (!ok || !data?.ok) { toast.error(data?.message || 'Failed to save'); return; }
-    setProfile(data.profile);
-    if (name) localStorage.setItem('userName', name);
-    toast.success('Profile saved');
-    onSaved?.({ name, bio, gender, interestedIn, interests, telegramId });
+  const enableLocation = async () => {
+    setLocationPrompted(true);
+    const c = await askLocation();
+    if (c) {
+      setCoords(c);
+      toast.success('Distance sorting enabled');
+    } else {
+      toast.error('Location permission denied. Showing global list.');
+    }
   };
 
-  const copyStumbleId = () => {
-    if (!profile?.stumble_id) return;
-    navigator.clipboard.writeText(profile.stumble_id);
-    toast.success('Stumble ID copied');
-  };
-
-  const handlePictureChange = async (e) => {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file) return;
-    if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.type)) {
-      toast.error('JPEG, PNG, WebP or GIF only');
+  const handleSearch = async (e) => {
+    e?.preventDefault();
+    const term = searchTerm.trim();
+    if (!term) { setSearchResult(null); return; }
+    const { data } = await apiJSON(`/api/users/search?stumble_id=${encodeURIComponent(term)}`);
+    if (!data?.ok || !data.user) {
+      setSearchResult({ notFound: true });
       return;
     }
-    if (file.size > 2 * 1024 * 1024) {
-      toast.error('Image too large (max 2MB)');
-      return;
-    }
-    setUploadingPic(true);
-    const fd = new FormData();
-    fd.append('file', file);
-    const res = await apiFetch('/api/profile/picture', { method: 'POST', body: fd });
-    const data = await res.json().catch(() => ({}));
-    setUploadingPic(false);
-    if (!res.ok || !data.ok) {
-      toast.error(data.message || 'Upload failed');
-      return;
-    }
-    setProfile((p) => ({ ...p, picture: data.picture }));
-    toast.success('Picture updated');
+    setSearchResult({ ...data.user, online: data.online });
   };
-
-  const handleRemovePicture = async () => {
-    if (!window.confirm('Remove your profile picture?')) return;
-    const { ok } = await apiJSON('/api/profile/picture', { method: 'DELETE' });
-    if (ok) {
-      setProfile((p) => ({ ...p, picture: '' }));
-      toast.success('Picture removed');
-    }
-  };
-
-  if (loading) {
-    return <div className="flex-1 flex items-center justify-center p-6"><div className="text-slate-400 text-sm">Loading profile…</div></div>;
-  }
-  if (!profile) {
-    return <div className="flex-1 flex items-center justify-center p-6 text-center"><p className="text-sm text-slate-300">Sign in to edit your profile.</p></div>;
-  }
-
-  const genderLocked = profile.gender_locked;
-  const isGoogle = profile.provider === 'google';
 
   return (
-    <div className="flex-1 overflow-y-auto px-4 py-4 space-y-5" data-testid="profile-tab">
-      <div className="flex items-center gap-3">
-        <div className="relative group">
-          {profile.picture ? (
-            <img src={profile.picture} alt={profile.name} className="h-16 w-16 rounded-2xl object-cover border border-slate-800" />
-          ) : (
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-tr from-[#7c5cfc] to-emerald-400 text-3xl shadow-lg shadow-emerald-500/10 select-none">
-              😊
-            </div>
-          )}
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploadingPic}
-            className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500 text-slate-950 hover:bg-emerald-400 border-2 border-slate-950 shadow-md disabled:opacity-50"
-            data-testid="upload-picture-btn"
-            title="Upload picture"
-          >
-            <Camera size={12} />
-          </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp,image/gif"
-            onChange={handlePictureChange}
-            className="hidden"
-            data-testid="picture-file-input"
-          />
-        </div>
-        <div className="flex-1 min-w-0">
-          <h2 className="text-lg font-bold text-white truncate" style={{ fontFamily: 'Syne, sans-serif' }}>
-            {profile.name || 'Your profile'}
-          </h2>
-          <p className="text-[11px] text-slate-400 truncate">{profile.email}</p>
-          <div className="flex items-center gap-2 mt-0.5">
-            <p className="text-[10px] text-slate-500">Signed in via {profile.provider || 'email'}</p>
-            {profile.picture && (
-              <button
-                onClick={handleRemovePicture}
-                className="text-[10px] text-red-400 hover:text-red-300 flex items-center gap-0.5"
-                data-testid="remove-picture-btn"
-              >
-                <Trash2 size={9} /> remove
+    <div className="flex flex-col h-full overflow-hidden">
+      {/* Search bar */}
+      <div className="px-4 pt-4 pb-2 space-y-3">
+        <form onSubmit={handleSearch} className="flex gap-2">
+          <div className="relative flex-1">
+            <AtSign size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+            <input
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search by Stumble ID (e.g. @cozypanda1234)"
+              className="w-full rounded-xl border border-slate-800 bg-slate-950 pl-9 pr-9 py-2.5 text-sm text-white placeholder-slate-600 focus:border-emerald-500 focus:outline-none"
+              data-testid="people-search-input"
+            />
+            {searchTerm && (
+              <button type="button" onClick={() => { setSearchTerm(''); setSearchResult(null); }} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white">
+                <X size={14} />
               </button>
             )}
-            {uploadingPic && <span className="text-[10px] text-emerald-400 animate-pulse">Uploading…</span>}
           </div>
+          <button type="submit" className="rounded-xl bg-emerald-500 text-slate-950 px-3 py-2.5 hover:bg-emerald-400" data-testid="people-search-btn">
+            <Search size={14} />
+          </button>
+        </form>
+
+        {searchResult && (
+          <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-3" data-testid="search-result">
+            {searchResult.notFound ? (
+              <div className="text-xs text-slate-300">
+                No user found with that Stumble ID.
+                <button onClick={() => setSearchResult(null)} className="ml-2 text-emerald-400 underline">Clear</button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3">
+                {searchResult.picture ? (
+                  <img src={searchResult.picture} className="h-10 w-10 rounded-xl object-cover" alt="" />
+                ) : (
+                  <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-[#7c5cfc] to-emerald-400 flex items-center justify-center text-lg">😊</div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-bold text-white truncate">{searchResult.name}</span>
+                    <span className={`text-[9px] rounded-full px-1.5 py-0.5 ${searchResult.online ? 'bg-emerald-500/20 text-emerald-300' : 'bg-slate-700/40 text-slate-400'}`}>
+                      {searchResult.online ? 'ONLINE' : 'OFFLINE'}
+                    </span>
+                  </div>
+                  <div className="text-[10px] font-mono text-emerald-400">{searchResult.stumble_id}</div>
+                  {searchResult.bio && <p className="text-[10px] text-slate-400 line-clamp-1 mt-0.5">{searchResult.bio}</p>}
+                </div>
+                <button
+                  onClick={() => onOpenChat(searchResult)}
+                  className="rounded-lg bg-emerald-500 text-slate-950 px-3 py-1.5 text-[11px] font-bold uppercase"
+                  data-testid="message-search-result"
+                >
+                  Message
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Header */}
+      <div className="px-4 pb-2 flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-bold text-white" style={{ fontFamily: 'Syne, sans-serif' }}>People</h2>
+          <p className="text-[11px] text-slate-400">
+            {loading ? 'Loading…' : `${users.length} online${coords ? ' · sorted by distance' : ''}`}
+          </p>
+        </div>
+        <div className="flex gap-2">
+          {!coords && (
+            <button
+              onClick={enableLocation}
+              disabled={locationPrompted}
+              className="flex items-center gap-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 px-2.5 py-1.5 text-[11px] font-semibold disabled:opacity-50"
+              data-testid="enable-location-btn"
+            >
+              <MapPin size={11} />
+              {locationPrompted ? 'Locating…' : 'Sort by distance'}
+            </button>
+          )}
+          <button
+            onClick={() => fetchUsers({ silent: false })}
+            className="flex items-center gap-1 rounded-lg bg-slate-800/60 border border-slate-700 text-slate-300 hover:text-white px-2.5 py-1.5 text-[11px] font-semibold"
+            data-testid="refresh-people"
+          >
+            <RefreshCw size={11} className={(loading || refreshing) ? 'animate-spin' : ''} />
+          </button>
         </div>
       </div>
 
-      {profile.stumble_id && (
-        <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3 flex items-center gap-2">
-          <AtSign size={14} className="text-emerald-400 shrink-0" />
-          <div className="flex-1 min-w-0">
-            <div className="text-[10px] uppercase tracking-wider text-emerald-300 font-semibold">Your Stumble ID</div>
-            <div className="text-sm font-mono text-white truncate" data-testid="stumble-id-display">{profile.stumble_id}</div>
-            <div className="text-[10px] text-slate-500">Share this so others can find you in People → Search.</div>
+      <div className="flex-1 overflow-y-auto px-4 pb-4 pt-1 space-y-2" data-testid="people-list">
+        {!loading && users.length === 0 && (
+          <div className="flex flex-col items-center justify-center h-full text-center py-12 px-4">
+            <div className="h-14 w-14 rounded-2xl bg-slate-800/60 border border-slate-700 flex items-center justify-center mb-3">
+              <span className="text-2xl">🌎</span>
+            </div>
+            <p className="text-sm font-bold text-white">No one's online matching your preferences</p>
+            <p className="text-[11px] text-slate-400 mt-1 max-w-xs">
+              We filter by your "Interested in" preference. Switch to <span className="text-emerald-400 font-semibold">Random Chat</span> to enter the global queue, or search by Stumble ID above.
+            </p>
           </div>
-          <button onClick={copyStumbleId} className="rounded-lg bg-slate-800 hover:bg-slate-700 p-1.5 text-emerald-300" data-testid="copy-stumble-id">
-            <Copy size={12} />
-          </button>
-        </div>
-      )}
-
-      <Field label="Display name">
-        <input
-          type="text" value={name} onChange={(e) => setName(e.target.value)} maxLength={60}
-          placeholder="e.g. Cozy Panda"
-          className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:border-emerald-500 focus:outline-none"
-          data-testid="profile-name-input"
-        />
-      </Field>
-
-      <Field label="Bio">
-        <textarea
-          value={bio} onChange={(e) => setBio(e.target.value)} maxLength={280} rows={3}
-          placeholder="Say something about yourself (280 chars max)"
-          className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:border-emerald-500 focus:outline-none resize-none"
-          data-testid="profile-bio-input"
-        />
-        <p className="text-[10px] text-slate-500 text-right">{bio.length}/280</p>
-      </Field>
-
-      <Field
-        label={`I am ${genderLocked ? '(locked)' : ''}`}
-        hint={genderLocked ? 'Gender is locked for Google-signed-in accounts and cannot be changed.' : null}
-      >
-        <div className="flex flex-wrap gap-2">
-          {GENDER_OPTIONS.map((o) => (
-            <Pill key={o.value || 'none'} active={gender === o.value} disabled={genderLocked && o.value !== gender} onClick={() => !genderLocked && setGender(o.value)} testid={`gender-${o.value || 'none'}`}>
-              {o.label}
-            </Pill>
-          ))}
-        </div>
-      </Field>
-
-      <Field label="Interested in">
-        <div className="flex flex-wrap gap-2">
-          {INTERESTED_IN_OPTIONS.map((o) => (
-            <Pill key={o.value || 'any'} active={interestedIn === o.value} onClick={() => setInterestedIn(o.value)} testid={`interested-in-${o.value || 'any'}`}>
-              {o.label}
-            </Pill>
-          ))}
-        </div>
-      </Field>
-
-      <Field label={`Interests (${interests.length}/10)`}>
-        <div className="flex flex-wrap gap-2 mb-2">
-          {interests.map((tag) => (
-            <span key={tag} className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 text-xs px-3 py-1">
-              #{tag}
-              <button onClick={() => removeInterest(tag)} className="ml-0.5 hover:text-white" data-testid={`remove-interest-${tag}`}><X size={11} /></button>
-            </span>
-          ))}
-        </div>
-        <div className="flex gap-2">
-          <input
-            type="text" value={newInterest} onChange={(e) => setNewInterest(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addInterest(newInterest))}
-            placeholder="Add an interest…"
-            className="flex-1 rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-emerald-500 focus:outline-none"
-            data-testid="add-interest-input"
-          />
-          <button type="button" onClick={() => addInterest(newInterest)} className="rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-300 px-3" data-testid="add-interest-btn">
-            <Plus size={16} />
-          </button>
-        </div>
-        <div className="flex flex-wrap gap-1.5 mt-2">
-          {SUGGESTED_INTERESTS.filter((s) => !interests.includes(s)).map((s) => (
-            <button key={s} type="button" onClick={() => addInterest(s)} className="text-[10px] uppercase tracking-wider rounded-full border border-slate-800 bg-slate-900 text-slate-400 hover:text-white hover:border-slate-700 px-2 py-0.5">
-              + {s}
-            </button>
-          ))}
-        </div>
-      </Field>
-
-      <Field
-        label="Telegram link"
-        hint="Optional: your Telegram username (e.g. @nick). Used by our bot for notifications and account linking."
-      >
-        <div className="relative">
-          <Send className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-sky-400" />
-          <input
-            type="text"
-            value={telegramId}
-            onChange={(e) => setTelegramId(e.target.value)}
-            placeholder="@your_telegram_username"
-            maxLength={64}
-            className="w-full rounded-xl border border-slate-800 bg-slate-950 pl-9 pr-3 py-2.5 text-sm text-white placeholder-slate-600 focus:border-emerald-500 focus:outline-none"
-            data-testid="telegram-id-input"
-          />
-        </div>
-      </Field>
-
-      <button
-        onClick={handleSave}
-        disabled={saving}
-        className="w-full flex items-center justify-center gap-2 rounded-2xl bg-emerald-500 text-slate-950 hover:bg-emerald-400 disabled:opacity-50 text-sm font-bold py-3 uppercase tracking-wider transition-colors"
-        data-testid="save-profile-btn"
-      >
-        <Save size={14} />
-        {saving ? 'Saving…' : 'Save profile'}
-      </button>
-
-      <HotlistSection onOpenChat={onOpenChat} refreshKey={hotlistRefresh} />
+        )}
+        {users.map((u) => <PersonCard key={u.user_id} user={u} onOpenChat={onOpenChat} />)}
+      </div>
     </div>
   );
 };
 
-export default ProfileTab;
+export default PeopleTab;
