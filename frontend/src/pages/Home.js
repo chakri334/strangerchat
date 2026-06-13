@@ -394,7 +394,13 @@ const Home = () => {
     <div className="flex min-h-screen flex-col bg-slate-950 text-slate-100" data-testid="home-page">
       <AppHeader profile={profileForHeader} isConnected={isConnected} isAuthenticated={isAuthenticated} onLogout={handleAbsoluteLogout} />
       <main className="flex flex-1 flex-col overflow-hidden pb-16">
-        {activeTab === 'people' && <PeopleTab onOpenChat={openDirectChat} />}
+        {activeTab === 'people' && (
+          <PeopleTab
+            onOpenChat={openDirectChat}
+            socket={socket}
+            sessionToken={sessionStorage.getItem('session_token') || ''}
+          />
+        )}
         {activeTab === 'random' && (
           <RandomChatTab isConnected={isConnected} isSearching={isSearching} onConnect={handleConnect} stats={stats} />
         )}

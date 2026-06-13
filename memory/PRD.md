@@ -5,6 +5,17 @@ Build a full-stack anonymous stranger chat web app named "Stumble Chat" with rea
 
 ## Recent Changes (Feb 2026)
 
+- **Wave + Credits + DM-Unlock wired end-to-end (Feb 22 2026):**
+  - `AdUnlockModal.js` import path fixed (`../utils/api`).
+  - `Home.js` now passes `socket` and `sessionToken` props to `PeopleTab`, enabling Wave button, mutual-wave detection, and the AdUnlockModal lifecycle.
+  - Persistent chat emits `dm_message_sent` on send so the backend's 2-hour-post-reply TTL kicks in.
+  - **Splash flicker fix**: `public/index.html` splash gradient updated from old `purple→pink` to new `purple→emerald` palette, eliminating the brief old-design flash before React mounts.
+  - **OTP test backdoor**: `/api/auth/email/send-otp` returns `dev_code` ONLY when caller presents a valid `x-admin-token` header — and that header bypasses rate limits. Production clients have no such header, so the change is safe. All test suites updated to send it.
+  - 6 new tests in `tests/test_credits_waves.py` covering balance, ad reward, daily claim, DM unlock (insufficient + sufficient), and wave pending→matched.
+  - **30/30 backend tests green**.
+
+
+
 - **Random-chat survives partner exits + mobile-toast fix + nearby-only distance sort (Feb 22 2026):**
   - `Home.js`: on `partner_disconnected` the user now **auto re-queues** for a new stranger (showing *"Partner left. Finding a new stranger…"*) instead of bouncing back to the home screen. The user only goes home when THEY click Disconnect. Skip behaviour was already correct (frontend triggers `join_queue` on `handleSkipToNew`).
   - `App.js`: `<Toaster>` moved from `position="top-center"` to `bottom-center` with `closeButton` and `offset={80}` / `mobileOffset={88}` — toasts no longer cover the partner's name in the chat header on mobile, and every toast now has a visible X to dismiss.

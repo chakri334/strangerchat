@@ -136,6 +136,8 @@ const PersistentChatPage = ({ peer, socket, myUserId, onBack, onBlocked }) => {
     }
     setMessages((prev) => [...prev, { ...data.message, sender_id: myUserId, recipient_id: peerId }]);
     setInput('');
+    // Tell server this is a reply in an unlocked DM so it can start the 2-hour TTL
+    if (socket?.connected) socket.emit('dm_message_sent', { partner_user_id: peerId });
   };
 
   const handleDeleteMsg = async (messageId, forEveryone) => {

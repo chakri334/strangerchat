@@ -21,7 +21,8 @@ def _new_email():
 def _login_via_otp(email=None):
     """Run send-otp + verify-otp, return (session_token, user_dict)."""
     email = email or _new_email()
-    r = requests.post(f"{BASE_URL}/api/auth/email/send-otp", json={"email": email})
+    r = requests.post(f"{BASE_URL}/api/auth/email/send-otp", json={"email": email},
+                      headers={"x-admin-token": ADMIN_TOKEN})
     assert r.status_code == 200, r.text
     code = r.json().get("dev_code")
     assert code and len(code) == 6

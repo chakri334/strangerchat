@@ -40,7 +40,9 @@ class TestEmailOtp:
         assert r.json().get('ok') is False
 
     def test_send_otp_returns_dev_code(self):
-        r = requests.post(f"{BASE_URL}/api/auth/email/send-otp", json={'email': _email('send')})
+        r = requests.post(f"{BASE_URL}/api/auth/email/send-otp",
+                          json={'email': _email('send')},
+                          headers={'x-admin-token': ADMIN_TOKEN})
         assert r.status_code == 200, r.text
         body = r.json()
         assert body['ok'] is True
@@ -49,7 +51,8 @@ class TestEmailOtp:
 
     def test_verify_otp_success_sets_cookie_and_returns_user(self):
         email = _email('verify')
-        send = requests.post(f"{BASE_URL}/api/auth/email/send-otp", json={'email': email}).json()
+        send = requests.post(f"{BASE_URL}/api/auth/email/send-otp", json={'email': email},
+                             headers={'x-admin-token': ADMIN_TOKEN}).json()
         code = send['dev_code']
 
         r = requests.post(
@@ -98,7 +101,8 @@ class TestEmailOtp:
 class TestAuthMe:
     def _login(self):
         email = _email('me')
-        send = requests.post(f"{BASE_URL}/api/auth/email/send-otp", json={'email': email}).json()
+        send = requests.post(f"{BASE_URL}/api/auth/email/send-otp", json={'email': email},
+                             headers={'x-admin-token': ADMIN_TOKEN}).json()
         code = send['dev_code']
         s = requests.Session()
         r = s.post(

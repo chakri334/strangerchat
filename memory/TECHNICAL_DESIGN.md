@@ -157,12 +157,13 @@ Run with: `REACT_APP_BACKEND_URL=$(grep REACT_APP_BACKEND_URL /app/frontend/.env
 | `test_router_refactor.py`                          | All 5 routers, shared state identity, admin gate, Socket.IO polling, bot.py import — **18 cases** | ✅ |
 | `test_monday_purge_and_google_filter.py`          | `next_monday_utc()`, Google-only active-users, hotlist-doesn't-touch-messages, Monday expiry on new msgs — **4 cases** | ✅ |
 | `test_people_sort_100km.py`                       | `NEARBY_KM` constant + sort split helper logic — **2 cases** | ✅ |
+| `test_credits_waves.py`                           | `/api/credits/{balance,claim-daily,claim-ad-reward,unlock-dm,dm-status}` + `/api/waves/send` pending→matched — **6 cases** | ✅ |
 | `test_profile_picture.py`                         | POST/DELETE /api/profile/picture (5 upload edges + 2 delete + 6 smoke) — **13 cases** | ✅ |
-| `test_auth_email_otp.py`                          | Email-OTP send/verify, cookie issuance, /auth/me cookie+bearer, admin gate, Socket.IO emoji pool | ✅ |
-| `test_profile_and_users.py`                       | /profile/me CRUD, /active-users schema. *2 pre-existing stale assertions (Chat server running / city_counts) — unrelated* | ⚠️ |
-| `test_stumble_features_v2.py`                     | Hotlist, blocked-list, conversations CRUD. `TestHotlist::test_pin_removes_ttl` SKIPPED (stale `conv_id_for` import) | ⚠️ |
+| `test_auth_email_otp.py`                          | Email-OTP send/verify (admin-gated dev_code), cookie issuance, /auth/me cookie+bearer | ✅ |
+| `test_profile_and_users.py`                       | /profile/me CRUD, /active-users schema. *2 pre-existing stale assertions — unrelated* | ⚠️ |
+| `test_stumble_features_v2.py`                     | Hotlist, blocked-list, conversations CRUD. *Skipped: stale `conv_id_for` import* | ⚠️ |
 
-**Total green: 41+** active backend cases. Always run the first three suites after any backend change.
+**Total green: 30** in the primary suite + auth/picture suites. Always run the first four after any backend change.
 
 ### Frontend Testing
 Smoke tests done via `mcp_screenshot_tool`. Larger flows via `testing_agent_v3_fork`.
@@ -209,6 +210,7 @@ Smoke tests done via `mcp_screenshot_tool`. Larger flows via `testing_agent_v3_f
 
 | Date         | Change                                                                                              |
 |--------------|-----------------------------------------------------------------------------------------------------|
+| Feb 22 2026  | **Wave + Credits + DM-Unlock** fully wired: AdUnlockModal import fixed, Home.js passes `socket`+`sessionToken` to PeopleTab, PersistentChatPage emits `dm_message_sent` to start the 2h-post-reply TTL. Splash gradient updated `purple→emerald` to remove URL-load flicker. OTP test backdoor moved behind `x-admin-token` header (production-safe). +6 tests in `test_credits_waves.py` — **30/30 backend tests green**. |
 | Feb 22 2026  | **Connect-button flicker** fixed (removed manual reconnect racing Socket.IO's auto-reconnect); **People tab silent auto-refresh** (background polls no longer show "Loading…") |
 | Feb 22 2026  | People-tab Google-only filter; Hotlist = pure contact bookmark; **Monday-purge** chat retention      |
 | Feb 22 2026  | Random chat survives partner exits (auto re-queue); Toaster moved bottom-center w/ close button; People sort 100 km cutoff |

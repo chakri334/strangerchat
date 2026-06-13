@@ -27,7 +27,9 @@ def _new_user(label="ref"):
     """Create user via email-OTP backdoor; returns (token, user_id)."""
     email = f"TEST_router_{label}_{uuid.uuid4().hex[:6]}@example.com"
     r = requests.post(f"{BASE_URL}/api/auth/email/send-otp",
-                      json={"email": email, "name": f"TEST {label}"}, timeout=10)
+                      json={"email": email, "name": f"TEST {label}"},
+                      headers={"x-admin-token": ADMIN_TOKEN},
+                      timeout=10)
     assert r.status_code == 200, r.text
     code = r.json().get("dev_code")
     assert code, r.json()

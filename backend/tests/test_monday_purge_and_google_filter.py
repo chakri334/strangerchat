@@ -31,7 +31,8 @@ def _auth(t):
 def _new_user(label="mon"):
     email = f"TEST_{label}_{uuid.uuid4().hex[:6]}@example.com"
     r = requests.post(f"{BASE_URL}/api/auth/email/send-otp",
-                      json={"email": email, "name": f"TEST {label}"}, timeout=10)
+                      json={"email": email, "name": f"TEST {label}"},
+                      headers={"x-admin-token": "stumblechat_admin_2026"}, timeout=10)
     assert r.status_code == 200, r.text
     code = r.json()["dev_code"]
     r2 = requests.post(f"{BASE_URL}/api/auth/email/verify-otp",
