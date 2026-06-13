@@ -15,9 +15,8 @@ router = APIRouter()
 
 @router.get("/api/check-ip")
 async def check_ip_block(request: Request):
-    client_ip = request.headers.get("x-forwarded-for", request.client.host)
-    if "," in client_ip:
-        client_ip = client_ip.split(",")[0].strip()
+    # Use request.client.host (set by nginx/uvicorn) — never trust x-forwarded-for from client
+    client_ip = request.client.host
 
     now = datetime.now(timezone.utc)
     expired = [ip for ip, expires in ip_blocks.items() if expires < now]
