@@ -212,10 +212,24 @@ async def handle_register_user(sid, data):
             try:
                 db_session = await sessions_collection.find_one({"session_token": session_token}, {"_id": 0})
                 if db_session:
-                    auth_user = {
-                        "user_id": db_session["user_id"], "email": db_session.get("email"),
-                        "name": db_session.get("name"), "picture": db_session.get("picture"),
-                    }
+                    # Check session expiry before accepting
+                    expires_at = db_session.get("expires_at")
+                    if expires_at:
+                        if isinstance(expires_at, str):
+                            from datetime import timezone as _tz
+                            expires_at = datetime.fromisoformat(expires_at)
+                        if expires_at.tzinfo is None:
+                            expires_at = expires_at.replace(tzinfo=timezone.utc)
+                        if expires_at < datetime.now(timezone.utc):
+                            # Session expired — clean up and treat as guest
+                            await sessions_collection.delete_one({"session_token": session_token})
+                            logger.info(f"Rejected expired session token on socket register for sid={sid}")
+                            db_session = None
+                    if db_session:
+                        auth_user = {
+                            "user_id": db_session["user_id"], "email": db_session.get("email"),
+                            "name": db_session.get("name"), "picture": db_session.get("picture"),
+                        }
             except Exception as e:
                 logger.error(f"Failed to resolve session for socket: {e}")
 
@@ -290,8 +304,21 @@ async def handle_send_photo(sid, data):
         return
     room_id = user_rooms[sid]
     photo_data = data.get("photo", "")
-    if not photo_data:
+    if not photo_data or not isinstance(photo_data, str):
         return
+
+    # Validate format: must be a base64 data URL of an allowed image type
+    ALLOWED_PHOTO_TYPES = ("data:image/jpeg;", "data:image/png;", "data:image/webp;", "data:image/gif;")
+    if not any(photo_data.startswith(t) for t in ALLOWED_PHOTO_TYPES):
+        await sio.emit("error", {"message": "Invalid photo format."}, room=sid)
+        return
+
+    # Size cap: base64 encodes ~1.33x, so 5MB image ≈ 6.8MB base64 string
+    MAX_PHOTO_B64_BYTES = 7 * 1024 * 1024  # 7MB base64 ceiling (~5MB raw image)
+    if len(photo_data) > MAX_PHOTO_B64_BYTES:
+        await sio.emit("error", {"message": "Photo too large. Max size is 5MB."}, room=sid)
+        return
+
     if room_id in active_chats:
         partner_sid = [s for s in active_chats[room_id] if s != sid]
         if partner_sid:
