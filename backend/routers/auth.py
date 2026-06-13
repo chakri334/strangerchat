@@ -145,7 +145,7 @@ async def email_send_otp(request: Request):
     )
     logger.info(f"OTP generated for {email}")
     # DEV ONLY — wire to email provider before production.
-    return {"ok": True, "message": "OTP sent", "dev_code": code}
+    return {"ok": True, "message": "OTP sent"}
 
 
 @router.post("/api/auth/email/verify-otp")
