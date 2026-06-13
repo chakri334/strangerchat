@@ -124,12 +124,40 @@ async def logout(request: Request, response: Response):
 
 
 # ─── Email OTP ─────────────────────────────────────────────────────────────
+# In-memory OTP rate limit store: email -> list of request timestamps
+_otp_send_log: dict[str, list] = {}
+_otp_ip_log:   dict[str, list] = {}
+
+OTP_PER_EMAIL_PER_HOUR = 3   # max OTPs per email per hour
+OTP_PER_IP_PER_HOUR    = 10  # max OTPs per IP per hour
+
+def _otp_rate_limited(store: dict, key: str, limit: int) -> bool:
+    """Return True if key has exceeded limit in the last 60 minutes."""
+    from datetime import timedelta
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(hours=1)
+    hits = [t for t in store.get(key, []) if t > cutoff]
+    store[key] = hits
+    if len(hits) >= limit:
+        return True
+    store[key].append(now)
+    return False
+
 @router.post("/api/auth/email/send-otp")
 async def email_send_otp(request: Request):
     body = await request.json()
     email = (body.get("email") or "").strip().lower()
     if not EMAIL_RE.match(email):
         return Response(status_code=400, content='{"ok": false, "message": "Invalid email"}', media_type="application/json")
+
+    # Rate limit by email
+    if _otp_rate_limited(_otp_send_log, email, OTP_PER_EMAIL_PER_HOUR):
+        return Response(status_code=429, content='{"ok": false, "message": "Too many OTP requests. Try again in an hour."}', media_type="application/json")
+
+    # Rate limit by IP
+    client_ip = request.client.host
+    if _otp_rate_limited(_otp_ip_log, client_ip, OTP_PER_IP_PER_HOUR):
+        return Response(status_code=429, content='{"ok": false, "message": "Too many requests from your network. Try again later."}', media_type="application/json")
 
     code = f"{secrets.randbelow(900000) + 100000}"
     from datetime import timedelta
@@ -143,8 +171,8 @@ async def email_send_otp(request: Request):
         }},
         upsert=True,
     )
-    logger.info(f"OTP generated for {email}")
-    # DEV ONLY — wire to email provider before production.
+    logger.info(f"OTP generated for {email} from {client_ip}")
+    # TODO: wire to email provider (SMTP/SendGrid) before production
     return {"ok": True, "message": "OTP sent"}
 
 
