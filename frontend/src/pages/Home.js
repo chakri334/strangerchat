@@ -39,7 +39,7 @@ const isGuestMode = () => {
 };
 
 const Home = () => {
-  const { user, isAuthenticated, logout } = useAuth();
+  const { user, isAuthenticated, loading: authLoading, logout } = useAuth();
   const [socket, setSocket] = useState(null);
   const [userCity, setUserCity] = useState('Global');
   const [stats, setStats] = useState({ online: 0, chats_today: 0, cities: 0 });
@@ -227,6 +227,38 @@ const Home = () => {
     newSocket.on('message_deleted', () => setChatRefreshKey((k) => k + 1));
     newSocket.on('conversation_cleared', () => setChatRefreshKey((k) => k + 1));
 
+    // Global wave-received toast (kept on Home so it works no matter which tab the user is on)
+    newSocket.on('wave_received', ({ from_user_id, from_name }) => {
+      const sessionToken = sessionStorage.getItem('session_token') || '';
+      toast(`👋 ${from_name} waved at you!`, {
+        description: 'Tap "Wave back" to mutually match and unlock DM.',
+        duration: 8000,
+        action: sessionToken ? {
+          label: 'Wave back',
+          onClick: async () => {
+            try {
+              const { apiJSON } = await import('../utils/api');
+              const { data } = await apiJSON('/api/waves/send', {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${sessionToken}` },
+                body: JSON.stringify({ to_user_id: from_user_id }),
+              });
+              if (data?.status === 'matched') {
+                toast.success(`🎉 Mutual wave with ${from_name}! Opening unlock…`);
+                setActiveTab('people'); // PeopleTab listens to wave_matched and opens AdUnlockModal
+              } else if (data?.ok) {
+                toast.success(`👋 Wave sent to ${from_name}!`);
+              } else {
+                toast.error(data?.message || 'Could not wave back.');
+              }
+            } catch {
+              toast.error('Failed to wave back. Try again.');
+            }
+          },
+        } : undefined,
+      });
+    });
+
     setSocket(newSocket);
 
     return () => newSocket.close();
@@ -341,7 +373,11 @@ const Home = () => {
   if (showOnboarding) return <OnboardingModal onAccept={() => setShowOnboarding(false)} />;
   if (isBlocked) return <BlockedScreen message={blockMessage} />;
   
-  const profileForHeader = { name: user?.name || userName, avatar: user?.picture ? null : '😊' };
+  // In guest mode the AuthContext `user` may still hold the previous Google
+  // identity from cache — never let it bleed into the header.
+  const profileForHeader = guest
+    ? { name: userName, avatar: '😊' }
+    : { name: user?.name || userName, avatar: user?.picture ? null : '😊' };
 
   // 1. GUEST INTERCEPT: Strict layout isolation
   if (guest) {
@@ -350,7 +386,8 @@ const Home = () => {
         <AppHeader
           profile={profileForHeader}
           isConnected={isConnected}
-          isAuthenticated={isAuthenticated}
+          isAuthenticated={isAuthenticated && !guest}
+          authLoading={authLoading}
           onLogout={handleAbsoluteLogout}
         />
         <main className="flex flex-1 flex-col">
@@ -392,7 +429,7 @@ const Home = () => {
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-950 text-slate-100" data-testid="home-page">
-      <AppHeader profile={profileForHeader} isConnected={isConnected} isAuthenticated={isAuthenticated} onLogout={handleAbsoluteLogout} />
+      <AppHeader profile={profileForHeader} isConnected={isConnected} isAuthenticated={isAuthenticated} authLoading={authLoading} onLogout={handleAbsoluteLogout} />
       <main className="flex flex-1 flex-col overflow-hidden pb-16">
         {activeTab === 'people' && (
           <PeopleTab

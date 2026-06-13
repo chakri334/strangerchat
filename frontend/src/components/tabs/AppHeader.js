@@ -1,8 +1,13 @@
 import { Radio, Settings as SettingsIcon, LogOut } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-const AppHeader = ({ profile, isConnected, isAuthenticated, onLogout }) => {
+const AppHeader = ({ profile, isConnected, isAuthenticated, authLoading, onLogout }) => {
   const navigate = useNavigate();
+  // Until AuthContext finishes its /api/auth/me round-trip we cannot trust cached
+  // `profile.name` — it might be a stale Google user lingering in localStorage from
+  // a closed session. Hide the pill in that window so guest visitors never see the
+  // previous user's name flash in the top-right corner.
+  const showProfilePill = profile?.name && !authLoading;
   return (
     <header
       className="sticky top-0 z-30 w-full border-b border-slate-800 bg-slate-900/90 backdrop-blur-md"
@@ -34,7 +39,7 @@ const AppHeader = ({ profile, isConnected, isAuthenticated, onLogout }) => {
         </div>
 
         <div className="flex items-center gap-2">
-          {profile?.name && (
+          {showProfilePill && (
             <div className="hidden sm:flex items-center gap-2 rounded-lg bg-slate-800/60 px-2.5 py-1 border border-slate-700/60">
               <span className="text-base select-none">{profile.avatar || '😊'}</span>
               <span className="text-xs font-semibold text-slate-200 truncate max-w-[120px]">
@@ -50,7 +55,7 @@ const AppHeader = ({ profile, isConnected, isAuthenticated, onLogout }) => {
           >
             <SettingsIcon size={16} className="text-slate-300" />
           </button>
-          {isAuthenticated && (
+          {isAuthenticated && !authLoading && (
             <button
               onClick={onLogout}
               className="p-2 rounded-lg bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 transition-colors"

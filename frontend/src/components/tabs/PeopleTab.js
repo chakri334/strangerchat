@@ -130,21 +130,9 @@ const PeopleTab = ({ onOpenChat, socket, sessionToken }) => {
     return () => clearInterval(t);
   }, [fetchUsers]);
 
-  // Listen for incoming wave_received and wave_matched socket events
+  // Listen for wave_matched only (global wave_received toast lives in Home.js so it works across tabs).
   useEffect(() => {
     if (!socket) return;
-
-    const onWaveReceived = ({ from_user_id, from_name, wave_id }) => {
-      toast(`👋 ${from_name} waved at you!`, {
-        description: 'Open the People tab and wave back to unlock DM.',
-        duration: 6000,
-      });
-      // Mark that person as having waved at us so the wave-back is prominent
-      setWaveState(prev => ({
-        ...prev,
-        [from_user_id]: prev[from_user_id] === 'sent' ? 'matched' : 'received',
-      }));
-    };
 
     const onWaveMatched = ({ partner_id, user_b_id, wave_id }) => {
       const pid = partner_id || user_b_id;
@@ -153,10 +141,8 @@ const PeopleTab = ({ onOpenChat, socket, sessionToken }) => {
       setAdModal({ partnerId: pid, partnerName: pName, waveId: wave_id || '' });
     };
 
-    socket.on('wave_received', onWaveReceived);
     socket.on('wave_matched', onWaveMatched);
     return () => {
-      socket.off('wave_received', onWaveReceived);
       socket.off('wave_matched', onWaveMatched);
     };
   }, [socket]);
