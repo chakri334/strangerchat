@@ -251,7 +251,7 @@ async def get_active_users(request: Request,
             continue
 
         entry = {
-            "sid": sid, "name": user.get("name", "Anonymous"),
+            "name": user.get("name", "Anonymous"),
             "age": user.get("age", ""), "gender": user.get("gender", ""),
             "city": user_city, "emoji": user.get("emoji", "😊"),
             "picture": user.get("picture") or "",
