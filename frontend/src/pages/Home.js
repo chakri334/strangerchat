@@ -46,7 +46,11 @@ const Home = () => {
   const [isSearching, setIsSearching] = useState(false);
   const [chatActive, setChatActive] = useState(false);
   const [partner, setPartner] = useState(null);
-  const [userName, setUserName] = useState('');
+  const [userName, setUserName] = useState(() => {
+    // Resolve correct name at init time — never bleed logged-in name into guest session
+    if (isGuestMode()) return `User${Math.floor(Math.random() * 9999)}`;
+    return localStorage.getItem('userName') || `User${Math.floor(Math.random() * 9999)}`;
+  });
   const [userGender, setUserGender] = useState('');
   const [userInterests, setUserInterests] = useState(readStoredInterests);
   const [isBlocked, setIsBlocked] = useState(false);
@@ -320,6 +324,7 @@ const Home = () => {
         onGetStarted={() => {
           try {
             localStorage.setItem('authSession', JSON.stringify({ mode: 'guest' }));
+              localStorage.removeItem('userName'); // prevent previous user's name bleeding into guest
           } catch (e) {}
           setShowLanding(false);
           setIsAuthed(true);
