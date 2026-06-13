@@ -13,7 +13,16 @@ export const useAuth = () => {
 };
 
 const readCachedUser = () => {
+  // Hard-clear hygiene: only trust cached `user` when a sessionStorage token
+  // exists (set on Google popup callback). Without it we cannot verify the
+  // identity until /api/auth/me responds, so we MUST start from null to avoid
+  // briefly rendering a previous session's name (e.g. on guest-mode visits).
   try {
+    const hasToken = !!sessionStorage.getItem(SESSION_TOKEN_KEY);
+    if (!hasToken) {
+      localStorage.removeItem(USER_KEY);
+      return null;
+    }
     const raw = localStorage.getItem(USER_KEY);
     return raw ? JSON.parse(raw) : null;
   } catch {
