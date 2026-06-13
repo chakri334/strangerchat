@@ -29,7 +29,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from pathlib import Path
 
-from db import users_collection, reports_collection, sessions_collection, messages_collection, init_indexes
+from db import users_collection, reports_collection, sessions_collection, messages_collection, init_indexes, credits_collection, waves_collection, dm_unlocks_collection
 from state import (
     sio, ALLOWED_ORIGINS,
     active_connections, waiting_queue, city_users, active_chats, user_rooms,
@@ -45,6 +45,8 @@ from routers.profile import router as profile_router
 from routers.conversations import router as conversations_router
 from routers.block import router as block_router
 from routers.admin import router as admin_router
+from routers.credits import router as credits_router
+from routers.waves import router as waves_router
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
@@ -130,6 +132,8 @@ app.include_router(profile_router, tags=["profile"])
 app.include_router(conversations_router, tags=["conversations"])
 app.include_router(block_router, tags=["block"])
 app.include_router(admin_router, tags=["admin"])
+app.include_router(credits_router, tags=["credits"])
+app.include_router(waves_router, tags=["waves"])
 
 
 # ─── Root + health ─────────────────────────────────────────────────────────
@@ -381,6 +385,61 @@ async def handle_get_random_topic(sid, data):
     ]
     await sio.emit("random_topic", {"topic": secrets.choice(topics)}, room=sid)
 
+
+
+@sio.on("confirm_dm_unlock")
+async def handle_confirm_dm_unlock(sid, data):
+    """
+    Called after user watches the rewarded ad on the frontend.
+    Completes the wave-matched DM unlock flow.
+    data: { wave_id, partner_user_id }
+    """
+    from routers.credits import create_dm_unlock, get_dm_unlock, _add_credits, AD_REWARD
+    from routers.waves import _notify_wave_matched, _sid_for_user
+
+    wave_id       = data.get("wave_id", "")
+    partner_id    = data.get("partner_user_id", "")
+    user_data     = active_connections.get(sid, {})
+    user_id       = user_data.get("user_id")
+
+    if not user_id or not partner_id:
+        await sio.emit("error", {"message": "Invalid unlock request."}, room=sid)
+        return
+
+    # Award ad credits
+    await _add_credits(user_id, AD_REWARD, "rewarded_ad_dm_unlock")
+
+    # Create DM unlock
+    await create_dm_unlock(user_id, partner_id)
+    unlock = await get_dm_unlock(user_id, partner_id)
+
+    expires_iso = unlock["expires_at"].isoformat() if unlock else None
+
+    # Notify both users
+    partner_sid = _sid_for_user(partner_id)
+    payload = {
+        "unlocked": True,
+        "partner_id": partner_id,
+        "expires_at": expires_iso,
+        "message": "Direct Message unlocked! You have 4 hours to start chatting.",
+    }
+    await sio.emit("dm_unlocked", {**payload, "partner_id": partner_id}, room=sid)
+    if partner_sid:
+        await sio.emit("dm_unlocked", {**payload, "partner_id": user_id}, room=partner_sid)
+
+
+@sio.on("dm_message_sent")
+async def handle_dm_message_sent(sid, data):
+    """
+    Track first reply in an unlocked DM to trigger the 2-hour expiry window.
+    data: { partner_user_id }
+    """
+    from routers.credits import record_dm_first_reply
+    user_data  = active_connections.get(sid, {})
+    user_id    = user_data.get("user_id")
+    partner_id = data.get("partner_user_id", "")
+    if user_id and partner_id:
+        await record_dm_first_reply(user_id, partner_id)
 
 @sio.on("report_user")
 async def handle_report_user(sid, data):
