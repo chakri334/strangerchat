@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Share2 } from 'lucide-react';
 import { toast } from 'sonner';
 import PhotoViewer from './PhotoViewer';
 import ChatHeader from './chat/ChatHeader';
@@ -181,6 +181,23 @@ const ChatPage = ({ socket, partner, onClose, onSkip }) => {
 
   const handleRandomTopic = useCallback(() => socket.emit('get_random_topic', {}), [socket]);
 
+  const handleShareStumbleId = useCallback(() => {
+    try {
+      const session = JSON.parse(localStorage.getItem('authSession') || '{}');
+      const stumbleId = session.stumble_id;
+      if (!stumbleId) {
+        toast.error('Create an account to get a Stumble ID you can share.');
+        return;
+      }
+      const shareText = `Find me on Stumble Chat! My ID is ${stumbleId} — search for me in the People tab.`;
+      socket.emit('send_message', { message: shareText });
+      setMessages(prev => [...prev, { text: shareText, from: 'me', timestamp: new Date() }]);
+      toast.success('Stumble ID shared in chat!');
+    } catch {
+      toast.error('Could not share Stumble ID.');
+    }
+  }, [socket]);
+
   const submitReport = useCallback(() => {
     const chatHistory = messages.map((msg) => ({
       from: msg.from,
@@ -212,6 +229,15 @@ const ChatPage = ({ socket, partner, onClose, onSkip }) => {
             data-testid="random-topic-button"
           >
             Random Topic
+          </button>
+          <button
+            onClick={handleShareStumbleId}
+            className="px-3 py-1.5 bg-white/5 hover:bg-[#7c5cfc]/20 rounded-full text-xs transition-colors flex items-center gap-1"
+            data-testid="share-stumble-id-button"
+            title="Share your Stumble ID so they can find you later"
+          >
+            <Share2 size={12} />
+            Share ID
           </button>
           <button
             onClick={() => setShowReportModal(true)}
