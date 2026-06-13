@@ -246,14 +246,10 @@ async def handle_register_user(sid, data):
 @sio.on("join_queue")
 async def handle_join_queue(sid, data):
     city = data.get("city", "Unknown")
-    target_sid = data.get("target_sid")
     if sid not in active_connections:
         await sio.emit("error", {"message": "Please register first"}, room=sid)
         return
     if sid in user_rooms:
-        return
-    if target_sid and target_sid in active_connections and target_sid != sid and target_sid not in user_rooms:
-        await create_match(sid, target_sid)
         return
     active_connections[sid]["city"] = city
     for queue_city, users in list(waiting_queue.items()):
