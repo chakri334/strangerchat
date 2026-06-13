@@ -165,7 +165,7 @@ const Home = () => {
         setGeoTitle(detectedCity);
         trackCitySearch(detectedCity);
         if (newSocket.connected) newSocket.emit('register_user', { ...buildRegisterPayload(detectedCity), lat: position.coords.latitude, lng: position.coords.longitude });
-      } catch {}
+      } catch (e) { if (process.env.NODE_ENV === 'development') console.warn('Geolocation failed:', e); }
     };
 
     detectUserLocation();
@@ -345,7 +345,9 @@ const Home = () => {
     sessionStorage.clear();
     try {
       logout();
-    } catch (e) {}
+    } catch (e) {
+      if (process.env.NODE_ENV === 'development') console.warn('logout() threw during full reset:', e);
+    }
     window.location.href = '/';
   }, [logout]);
 
@@ -357,7 +359,9 @@ const Home = () => {
           try {
             localStorage.setItem('authSession', JSON.stringify({ mode: 'guest' }));
               localStorage.removeItem('userName'); // prevent previous user's name bleeding into guest
-          } catch (e) {}
+          } catch (e) {
+            if (process.env.NODE_ENV === 'development') console.warn('localStorage write blocked (private mode?):', e);
+          }
           setShowLanding(false);
           setIsAuthed(true);
           setTimeout(() => {

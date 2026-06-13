@@ -3,6 +3,9 @@ import { createContext, useContext, useState, useEffect, useCallback } from 'rea
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const USER_KEY = 'user';
 const SESSION_TOKEN_KEY = 'session_token'; // sessionStorage only (cleared on tab close)
+const IS_DEV = process.env.NODE_ENV === 'development';
+const devLog = (...args) => { if (IS_DEV) console.warn(...args); };
+const devErr = (...args) => { if (IS_DEV) console.error(...args); };
 
 const AuthContext = createContext(null);
 
@@ -67,7 +70,7 @@ export const AuthProvider = ({ children }) => {
       setUser(null);
       clearAuthStorage();
     } catch (err) {
-      console.warn('Auth check failed, using cached user:', err.message);
+      devLog('Auth check failed, using cached user:', err.message);
     } finally {
       setLoading(false);
     }
@@ -82,7 +85,7 @@ export const AuthProvider = ({ children }) => {
       const response = await fetch(`${BACKEND_URL}/api/auth/google/start`, { credentials: 'include' });
       const data = await response.json();
       if (!data.ok || !data.auth_url) {
-        console.error('Failed to start Google sign-in:', data.message);
+        devErr('Failed to start Google sign-in:', data.message);
         return;
       }
       const width = 500;
@@ -95,7 +98,7 @@ export const AuthProvider = ({ children }) => {
         `width=${width},height=${height},left=${left},top=${top},scrollbars=yes`
       );
     } catch (err) {
-      console.error('Google auth error:', err);
+      devErr('Google auth error:', err);
     }
   }, []);
 
@@ -124,7 +127,7 @@ export const AuthProvider = ({ children }) => {
         credentials: 'include',
       });
     } catch (err) {
-      console.warn('Logout request failed:', err.message);
+      devLog('Logout request failed:', err.message);
     } finally {
       setUser(null);
       clearAuthStorage();
