@@ -294,13 +294,15 @@ async def handle_send_photo(sid, data):
         partner_sid = [s for s in active_chats[room_id] if s != sid]
         if partner_sid:
             photo_id = str(uuid.uuid4())
-            photo_messages[photo_id] = {
-                "sender_sid": sid, "receiver_sid": partner_sid[0], "room_id": room_id,
-                "photo": photo_data, "opened": False, "timer_started": False,
-                "created_at": datetime.now(timezone.utc),
-            }
+            # Relay immediately — do NOT store base64 in memory
             await sio.emit("photo_sent", {"photo": photo_data, "photo_id": photo_id}, room=sid)
             await sio.emit("new_photo", {"photo": photo_data, "photo_id": photo_id}, room=partner_sid[0])
+            # Store only metadata for timer/delete tracking
+            photo_messages[photo_id] = {
+                "sender_sid": sid, "receiver_sid": partner_sid[0], "room_id": room_id,
+                "opened": False, "timer_started": False,
+                "created_at": datetime.now(timezone.utc),
+            }
 
 
 @sio.on("photo_opened")
