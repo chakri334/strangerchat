@@ -28,7 +28,7 @@ EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 def require_admin(request: Request) -> bool:
     if not ADMIN_TOKEN:
         return False
-    provided = request.headers.get("x-admin-token") or request.query_params.get("token")
+    provided = request.headers.get("x-admin-token")  # header-only — never accept via URL query param (leaks to logs)
     return provided == ADMIN_TOKEN
 
 
