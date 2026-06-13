@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X, Play, Coins, Star, Gift, ChevronRight, Check, Lock } from 'lucide-react';
 import { toast } from 'sonner';
-import { apiJSON } from '../../utils/api';
+import { apiJSON } from '../utils/api';
 
 /**
  * AdUnlockModal
