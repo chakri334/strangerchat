@@ -157,9 +157,9 @@ async def api_root():
 @sio.event
 async def connect(sid, environ):
     logger.info(f"Client connected: {sid}")
-    client_ip = environ.get("HTTP_X_FORWARDED_FOR", environ.get("REMOTE_ADDR", "unknown"))
-    if "," in str(client_ip):
-        client_ip = client_ip.split(",")[0].strip()
+    # Use REMOTE_ADDR (set by nginx) as the trusted IP.
+    # X-Forwarded-For is client-controlled and can be spoofed — never use it for blocking.
+    client_ip = environ.get("REMOTE_ADDR", "unknown")
     user_ip_map[sid] = client_ip
 
     now = datetime.now(timezone.utc)
