@@ -74,7 +74,13 @@ async def profile_update(request: Request):
     if isinstance(body.get("images"), list):
         updates["images"] = [str(i) for i in body["images"] if isinstance(i, str)][:5]
     if isinstance(body.get("picture"), str):
-        updates["picture"] = body["picture"]
+        pic = body["picture"]
+        # Must be empty string (clear picture) or a valid base64 image data URL
+        ALLOWED_PIC_PREFIXES = ("data:image/jpeg;", "data:image/png;", "data:image/webp;", "data:image/gif;")
+        if pic == "" or any(pic.startswith(p) for p in ALLOWED_PIC_PREFIXES):
+            # Size cap: ~2MB raw image = ~2.7MB base64
+            if len(pic) <= 3 * 1024 * 1024:
+                updates["picture"] = pic
     if isinstance(body.get("telegram_id"), str):
         updates["telegram_id"] = body["telegram_id"].strip()[:64]
 
