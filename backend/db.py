@@ -18,7 +18,10 @@ users_collection = db['users']
 reports_collection = db['reports']
 sessions_collection = db['sessions']
 otp_collection = db['email_otps']
-messages_collection = db['messages']  # persisted People-tab chats
+messages_collection = db["messages"]  # persisted People-tab chats
+credits_collection = db["credits"]    # user credit balances + transactions
+waves_collection = db["waves"]        # wave requests between users
+dm_unlocks_collection = db["dm_unlocks"]  # unlocked DM pairs with expiry
 
 
 def conv_id_for(user_a: str, user_b: str) -> str:
@@ -46,3 +49,13 @@ async def init_indexes():
     # All chats expire next Monday 00:00 UTC (set on each insert; see routers/conversations.next_monday_utc).
     # Legacy pinned messages without `expires_at` are backfilled on app startup.
     await messages_collection.create_index('expires_at', expireAfterSeconds=0)
+    # Credits
+    await credits_collection.create_index('user_id', unique=True)
+
+    # Waves
+    await waves_collection.create_index([('from_user_id', 1), ('to_user_id', 1)])
+    await waves_collection.create_index('expires_at', expireAfterSeconds=0)
+
+    # DM unlocks
+    await dm_unlocks_collection.create_index([('user_a', 1), ('user_b', 1)])
+    await dm_unlocks_collection.create_index('expires_at', expireAfterSeconds=0)
