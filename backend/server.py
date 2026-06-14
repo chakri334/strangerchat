@@ -93,16 +93,20 @@ async def lifespan(app_instance):
     except Exception as e:
         logger.error(f"Message TTL backfill failed: {e}")
 
-    # Telegram bot (optional)
+    # Telegram bot (opt-in via ENABLE_TELEGRAM_BOT=true to avoid preview ⇄ production
+    # poller conflict on the same bot token — production should set this, preview should NOT)
     bot_task = None
     telegram_token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
-    if telegram_token:
+    bot_enabled = os.environ.get("ENABLE_TELEGRAM_BOT", "").lower() in ("true", "1", "yes")
+    if telegram_token and bot_enabled:
         try:
             from bot import run_bot
             bot_task = asyncio.create_task(run_bot())
             logger.info("Telegram bot started successfully")
         except Exception as e:
             logger.error(f"Failed to start Telegram bot: {e}")
+    elif telegram_token:
+        logger.info("Telegram bot DISABLED (set ENABLE_TELEGRAM_BOT=true to enable). Bot token present but bot will not poll.")
 
     yield
 
