@@ -262,7 +262,13 @@ const Home = () => {
     setSocket(newSocket);
 
     return () => newSocket.close();
-  }, [guest]);
+  // Socket is created ONCE and lives for the component lifetime. We intentionally
+  // omit `guest`/`isAuthed` from deps — flipping them used to close & recreate the
+  // socket, which the server saw as a disconnect mid-match, firing partner_disconnected
+  // to the user's actual chat partner and breaking matching. Identity updates are
+  // re-emitted via the useEffect below on register_user.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (!socket || !socket.connected) return;
