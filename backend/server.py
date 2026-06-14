@@ -93,20 +93,30 @@ async def lifespan(app_instance):
     except Exception as e:
         logger.error(f"Message TTL backfill failed: {e}")
 
-    # Telegram bot (opt-in via ENABLE_TELEGRAM_BOT=true to avoid preview ⇄ production
-    # poller conflict on the same bot token — production should set this, preview should NOT)
+    # Telegram bot — auto-detect environment to prevent preview ⇄ production
+    # poller fight on the same bot token.
+    # In Emergent the supervisor-managed backend has `APP_URL` injected; in preview/dev
+    # pods it contains `.preview.emergentagent.com`, in production it's the custom domain
+    # (e.g. `stumblechat.online`). Bot runs only on production.
+    # Explicit override `ENABLE_TELEGRAM_BOT=false` force-disables it anywhere (escape hatch).
     bot_task = None
     telegram_token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
-    bot_enabled = os.environ.get("ENABLE_TELEGRAM_BOT", "").lower() in ("true", "1", "yes")
-    if telegram_token and bot_enabled:
+    app_url = os.environ.get("APP_URL", "")
+    is_preview_env = ".preview.emergentagent.com" in app_url
+    explicit_off = os.environ.get("ENABLE_TELEGRAM_BOT", "").lower() in ("false", "0", "no")
+    should_run_bot = bool(telegram_token) and (not is_preview_env) and (not explicit_off)
+
+    if should_run_bot:
         try:
             from bot import run_bot
             bot_task = asyncio.create_task(run_bot())
             logger.info("Telegram bot started successfully")
         except Exception as e:
             logger.error(f"Failed to start Telegram bot: {e}")
-    elif telegram_token:
-        logger.info("Telegram bot DISABLED (set ENABLE_TELEGRAM_BOT=true to enable). Bot token present but bot will not poll.")
+    elif telegram_token and is_preview_env:
+        logger.info(f"Telegram bot DISABLED in preview environment (APP_URL={app_url}). Production owns the bot.")
+    elif telegram_token and explicit_off:
+        logger.info("Telegram bot DISABLED via ENABLE_TELEGRAM_BOT=false override.")
 
     yield
 
