@@ -172,8 +172,31 @@ const LandingPage = ({ onGetStarted }) => {
             </a>
           ))}
           <a href="https://stumblechat.blogspot.com" rel="noopener noreferrer" target="_blank" className="text-[11px] text-slate-500 hover:text-slate-300">Blog</a>
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                if ('caches' in window) {
+                  const keys = await caches.keys();
+                  await Promise.all(keys.map((k) => caches.delete(k)));
+                }
+                if ('serviceWorker' in navigator) {
+                  const regs = await navigator.serviceWorker.getRegistrations();
+                  await Promise.all(regs.map((r) => r.unregister()));
+                }
+              } catch {}
+              window.location.href = window.location.pathname + '?_cb=' + Date.now();
+            }}
+            className="text-[11px] text-emerald-400 hover:text-emerald-300 underline underline-offset-2"
+            data-testid="force-refresh"
+            title="Force refresh — wipes browser cache & reloads"
+          >
+            Refresh App
+          </button>
         </div>
-        <div className="text-[11px] text-slate-600">© 2026 Stumble Chat</div>
+        <div className="text-[11px] text-slate-600 font-mono">
+          © 2026 Stumble Chat · v{process.env.REACT_APP_BUILD_ID || 'dev'}
+        </div>
       </footer>
 
     </div>
